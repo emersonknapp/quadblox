@@ -7,9 +7,12 @@ set(SOURCE_DIR ${${PROJECT_NAME}_SOURCE_DIR})
 set(CMAKE_MODULE_PATH "${SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH} )
 
 find_package(SDL2 REQUIRED)
-
 include_directories(${SDL2_INCLUDE_DIR})
 list(APPEND LINK_LIBS ${SDL2_LIBRARY})
+
+find_package(SDL2_Image REQUIRED)
+include_directories(${SDL2_IMAGE_INCLUDE_DIR})
+list(APPEND LINK_LIBS ${SDL2_IMAGE_LIBRARIES})
 
 set(BIN_DIR "${SOURCE_DIR}/bin")
 
