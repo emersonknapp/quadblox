@@ -4,37 +4,67 @@
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
 
-enum Assets {
-    ASSET_BACKGROUND,
-    ASSET_COUNT
-};
-
-SDL_Window* gWindow = NULL;
-SDL_Surface* gScreenSurface = NULL;
-SDL_Surface* gAssetSurfaces[ ASSET_COUNT ];
-
-
-
-
-
-void PrintSDLError(const char* const message) {
+void PrintSDLError( const char* message ) {
     printf("%s Error: %s\n", message, SDL_GetError());
 }
 
-SDL_Surface* LoadSurface( const char* path ) {
-    SDL_Surface* optimizedSurface = NULL;
+SDL_Window* gWindow = NULL;
+SDL_Renderer* gRenderer = NULL;
+SDL_Texture* gTexture = NULL;
+
+SDL_Texture* loadTexture( const char* path ) {
+    SDL_Texture* newTexture = NULL;
     SDL_Surface* loadedSurface = IMG_Load( path );
     if ( loadedSurface == NULL ) {
-        PrintSDLError( "Couldn't load image" );
+        PrintSDLError("IMG_Load");
     } else {
-        optimizedSurface = SDL_ConvertSurface( loadedSurface, gScreenSurface->format, 0 );
-        if ( optimizedSurface == NULL ) {
-            PrintSDLError( "Unable to optimize surface" );
+        newTexture = SDL_CreateTextureFromSurface( gRenderer, loadedSurface );
+        if ( newTexture == NULL ) {
+            PrintSDLError( "SDL_CreateTextureFromSurface" );
         }
         SDL_FreeSurface( loadedSurface );
     }
-    return optimizedSurface;
+    return newTexture;
 }
+
+bool loadMedia() {
+    bool success = true;
+    gTexture = loadTexture( "assets/03.png" );
+    if ( gTexture == NULL ) {
+        printf( "Failed to load texture image!\n" );
+        success = false;
+    }
+    return success;
+}
+
+void close() {
+    SDL_DestroyTexture( gTexture );
+    gTexture = NULL;
+    SDL_DestroyRenderer( gRenderer );
+    gRenderer = NULL;
+    SDL_DestroyWindow( gWindow );
+    gWindow = NULL;
+    IMG_Quit();
+    SDL_Quit();
+}
+
+
+
+
+// SDL_Surface* LoadSurface( const char* path ) {
+//     SDL_Surface* optimizedSurface = NULL;
+//     SDL_Surface* loadedSurface = IMG_Load( path );
+//     if ( loadedSurface == NULL ) {
+//         PrintSDLError( "Couldn't load image" );
+//     } else {
+//         optimizedSurface = SDL_ConvertSurface( loadedSurface, gScreenSurface->format, 0 );
+//         if ( optimizedSurface == NULL ) {
+//             PrintSDLError( "Unable to optimize surface" );
+//         }
+//         SDL_FreeSurface( loadedSurface );
+//     }
+//     return optimizedSurface;
+// }
 
 int main( int /*argc*/, char** /*argv*/ ) {
     // Initialization
@@ -44,14 +74,21 @@ int main( int /*argc*/, char** /*argv*/ ) {
         PrintSDLError("SDL_Init");
         quit = true;
     } else {
-        gWindow = SDL_CreateWindow("Hello World!", 100, 100, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+        gWindow = SDL_CreateWindow("Hello World!", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
         if ( gWindow == NULL ) {
             PrintSDLError("SDL_CreateWindow");
             quit = true;
+            close();
         } else {
-            gScreenSurface = SDL_GetWindowSurface( gWindow );
-
-            gAssetSurfaces[ ASSET_BACKGROUND ] = LoadSurface( "assets/02.png" );
+            gRenderer = SDL_CreateRenderer( gWindow, -1, SDL_RENDERER_ACCELERATED );
+            if ( gRenderer == NULL ) {
+                PrintSDLError( "SDL_CreateRenderer" );
+                quit = true;
+            } else {
+                if ( !loadMedia() ) {
+                    quit = true;
+                }
+            }
         }
     }
 
@@ -89,20 +126,12 @@ int main( int /*argc*/, char** /*argv*/ ) {
         }
 
         // Rendering
-        SDL_Rect stretchRect;
-        stretchRect.x = 0;
-        stretchRect.y = 0;
-        stretchRect.w = SCREEN_WIDTH;
-        stretchRect.h = SCREEN_HEIGHT;
-        SDL_BlitScaled( gAssetSurfaces[ ASSET_BACKGROUND ], NULL, gScreenSurface, &stretchRect );
-        //SDL_BlitSurface(gAssetSurfaces, NULL, screenSurface, NULL);
-        SDL_UpdateWindowSurface( gWindow );
+        SDL_RenderClear( gRenderer );
+        SDL_RenderCopy( gRenderer, gTexture, NULL, NULL );
+        SDL_RenderPresent( gRenderer );
     }
 
-
-
     // Shutdown
-    SDL_DestroyWindow( gWindow );
-    SDL_Quit();
+    close();
     return 0;
 }
