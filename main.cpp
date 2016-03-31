@@ -39,6 +39,27 @@ int main( int /*argc*/, char** /*argv*/ ) {
         while ( SDL_PollEvent( &e ) != 0 ) {
             if ( e.type == SDL_QUIT ) {
                 quit = true;
+            } else if ( e.type == SDL_KEYDOWN ) {
+                switch ( e.key.keysym.sym ) {
+                    case SDLK_UP:
+                        printf("UP\n");
+                        break;
+                    case SDLK_DOWN:
+                        printf("DOWN\n");
+                        break;
+                    case SDLK_LEFT:
+                        printf("LEFT\n");
+                        break;
+                    case SDLK_RIGHT:
+                        printf("RIGHT\n");
+                        break;
+                    case SDLK_q:
+                    case SDLK_ESCAPE:
+                        quit = true;
+                        break;
+                    default:
+                        break;
+                }
             }
         }
         SDL_BlitSurface(helloWorld, NULL, screenSurface, NULL);
