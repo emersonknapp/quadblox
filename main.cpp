@@ -48,87 +48,85 @@ void close() {
     SDL_Quit();
 }
 
-
-
-
-// SDL_Surface* LoadSurface( const char* path ) {
-//     SDL_Surface* optimizedSurface = NULL;
-//     SDL_Surface* loadedSurface = IMG_Load( path );
-//     if ( loadedSurface == NULL ) {
-//         PrintSDLError( "Couldn't load image" );
-//     } else {
-//         optimizedSurface = SDL_ConvertSurface( loadedSurface, gScreenSurface->format, 0 );
-//         if ( optimizedSurface == NULL ) {
-//             PrintSDLError( "Unable to optimize surface" );
-//         }
-//         SDL_FreeSurface( loadedSurface );
-//     }
-//     return optimizedSurface;
-// }
-
-int main( int /*argc*/, char** /*argv*/ ) {
-    // Initialization
-    bool quit = false;
-
+bool init() {
+    bool success = true;
     if ( SDL_Init( SDL_INIT_VIDEO ) != 0 ) {
         PrintSDLError("SDL_Init");
-        quit = true;
+        success = false;
     } else {
+        if ( !SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, "1" ) ) {
+            printf( "Warning: Linear texture filtering not enabled!" );
+        }
+
         gWindow = SDL_CreateWindow("Hello World!", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
         if ( gWindow == NULL ) {
             PrintSDLError("SDL_CreateWindow");
-            quit = true;
-            close();
+            success = false;
         } else {
             gRenderer = SDL_CreateRenderer( gWindow, -1, SDL_RENDERER_ACCELERATED );
             if ( gRenderer == NULL ) {
                 PrintSDLError( "SDL_CreateRenderer" );
-                quit = true;
+                success = false;
             } else {
-                if ( !loadMedia() ) {
-                    quit = true;
+                SDL_SetRenderDrawColor( gRenderer, 0xFF, 0x00, 0x00, 0xFF );
+                int imgFlags = IMG_INIT_PNG;
+                if ( !( IMG_Init( imgFlags ) & imgFlags ) ) {
+                    printf( "SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError() );
+                    success = false;
                 }
             }
         }
     }
+    return success;
+}
 
-    // Main Loop
+int main( int /*argc*/, char** /*argv*/ ) {
+    // Initialization
+    if ( !init() ) {
+        printf( "Failed to initialize\n" );
+    } else {
+        if ( !loadMedia() ) {
+            printf( "Failed to load media\n" );
+        } else {
+            // Main Loop
+            bool quit = false;
+            SDL_Event e;
 
-    SDL_Event e;
-
-    while ( !quit ) {
-        // Input handling
-        while ( SDL_PollEvent( &e ) != 0 ) {
-            if ( e.type == SDL_QUIT ) {
-                quit = true;
-            } else if ( e.type == SDL_KEYDOWN ) {
-                switch ( e.key.keysym.sym ) {
-                    case SDLK_UP:
-                        printf("UP\n");
-                        break;
-                    case SDLK_DOWN:
-                        printf("DOWN\n");
-                        break;
-                    case SDLK_LEFT:
-                        printf("LEFT\n");
-                        break;
-                    case SDLK_RIGHT:
-                        printf("RIGHT\n");
-                        break;
-                    case SDLK_q:
-                    case SDLK_ESCAPE:
+            while ( !quit ) {
+                // Input handling
+                while ( SDL_PollEvent( &e ) != 0 ) {
+                    if ( e.type == SDL_QUIT ) {
                         quit = true;
-                        break;
-                    default:
-                        break;
+                    } else if ( e.type == SDL_KEYDOWN ) {
+                        switch ( e.key.keysym.sym ) {
+                            case SDLK_UP:
+                                printf("UP\n");
+                                break;
+                            case SDLK_DOWN:
+                                printf("DOWN\n");
+                                break;
+                            case SDLK_LEFT:
+                                printf("LEFT\n");
+                                break;
+                            case SDLK_RIGHT:
+                                printf("RIGHT\n");
+                                break;
+                            case SDLK_q:
+                            case SDLK_ESCAPE:
+                                quit = true;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
                 }
+
+                // Rendering
+                SDL_RenderClear( gRenderer );
+                SDL_RenderCopy( gRenderer, gTexture, NULL, NULL );
+                SDL_RenderPresent( gRenderer );
             }
         }
-
-        // Rendering
-        SDL_RenderClear( gRenderer );
-        SDL_RenderCopy( gRenderer, gTexture, NULL, NULL );
-        SDL_RenderPresent( gRenderer );
     }
 
     // Shutdown
