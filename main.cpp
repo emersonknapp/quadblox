@@ -39,12 +39,15 @@ SDL_Texture* loadTexture( const char* path, SDL_Renderer* renderer ) {
 }
 
 struct QuadBlock {
+    QuadBlock( int x, int y ) : x(x), y(y), landed(false) {}
     int x;
     int y;
+    bool landed;
 };
 
 typedef struct GameState {
-    float fallsPerSecond = 1;
+    std::chrono::duration<double> timeSinceLastFall = std::chrono::duration<double>( 0.0 );
+    std::chrono::duration<double> fallsPerSecond = std::chrono::duration<double>( 1.0 );
     std::vector<QuadBlock> blocks;
 } GameState;
 
@@ -124,7 +127,17 @@ void shutdownSDL( Platform* platform ) {
 }
 
 void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
-
+    gameState->timeSinceLastFall += dt;
+    if ( gameState->timeSinceLastFall > gameState->fallsPerSecond ) {
+        for ( QuadBlock& qb : gameState->blocks ) {
+            if ( qb.landed ) continue;
+            qb.y += 1;
+            if ( qb.y >= (PLAYAREA_HEIGHT - 1) ) {
+                qb.landed = true;
+            }
+        }
+        gameState->timeSinceLastFall -= gameState->fallsPerSecond;
+    }
 }
 
 void drawGame( SDL_Renderer* renderer, const GameState* gameState ) {
@@ -159,7 +172,7 @@ void mainLoop( SDL_Renderer* renderer ) {
     SDL_Event e;
 
     GameState gameState;
-    QuadBlock block0 = { 0, 0 };
+    QuadBlock block0( 0, 0 );
     gameState.blocks.push_back( block0 );
 
     std::chrono::duration<double> tSeconds( 0.0 );
