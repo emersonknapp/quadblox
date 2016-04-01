@@ -48,6 +48,7 @@ struct QuadBlock {
 typedef struct GameState {
     std::chrono::duration<double> timeSinceLastFall = std::chrono::duration<double>( 0.0 );
     std::chrono::duration<double> fallsPerSecond = std::chrono::duration<double>( 1.0 );
+    QuadBlock currentBlock = QuadBlock( 0, 0 );
     std::vector<QuadBlock> blocks;
 } GameState;
 
@@ -129,15 +130,24 @@ void shutdownSDL( Platform* platform ) {
 void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
     gameState->timeSinceLastFall += dt;
     if ( gameState->timeSinceLastFall > gameState->fallsPerSecond ) {
-        for ( QuadBlock& qb : gameState->blocks ) {
-            if ( qb.landed ) continue;
-            qb.y += 1;
-            if ( qb.y >= (PLAYAREA_HEIGHT - 1) ) {
-                qb.landed = true;
-            }
-        }
         gameState->timeSinceLastFall -= gameState->fallsPerSecond;
+
+        QuadBlock& qb = gameState->currentBlock;
+        qb.y += 1;
+        if ( qb.y >= (PLAYAREA_HEIGHT - 1) ) {
+            qb.landed = true;
+        }
+        if ( qb.landed ) {
+            gameState->blocks.push_back( gameState->currentBlock );
+            gameState->currentBlock = QuadBlock( 0, 0 );
+        }
+
     }
+}
+
+void drawBlock( SDL_Renderer* renderer, const QuadBlock& qb, int w, int h ) {
+    SDL_Rect blockRect = Rect( qb.x * w, qb.y * h, w, h );
+    SDL_RenderFillRect( renderer, &blockRect );
 }
 
 void drawGame( SDL_Renderer* renderer, const GameState* gameState ) {
@@ -158,10 +168,9 @@ void drawGame( SDL_Renderer* renderer, const GameState* gameState ) {
     int blockWidth = gameAreaWidth / PLAYAREA_WIDTH;
     int blockHeight = gameAreaHeight / PLAYAREA_HEIGHT;
     SDL_SetRenderDrawColor( renderer, 0x00, 0xAA, 0xAA, 0xFF );
-    SDL_Rect blockRect;
+    drawBlock( renderer, gameState->currentBlock, blockWidth, blockHeight );
     for ( const QuadBlock& qb : gameState->blocks ) {
-        blockRect = Rect( qb.x * blockWidth, qb.y * blockHeight, blockWidth, blockHeight );
-        SDL_RenderFillRect( renderer, &blockRect );
+        drawBlock( renderer, qb, blockWidth, blockHeight );
     }
 
     SDL_RenderPresent( renderer );
@@ -172,8 +181,6 @@ void mainLoop( SDL_Renderer* renderer ) {
     SDL_Event e;
 
     GameState gameState;
-    QuadBlock block0( 0, 0 );
-    gameState.blocks.push_back( block0 );
 
     std::chrono::duration<double> tSeconds( 0.0 );
     std::chrono::duration<double> dtSeconds( 0.01 );
