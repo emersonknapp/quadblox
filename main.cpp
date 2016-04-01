@@ -2,6 +2,7 @@
 #include "SDL_image.h"
 
 #include <vector>
+#include <chrono>
 
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
@@ -122,6 +123,10 @@ void shutdownSDL( Platform* platform ) {
     delete platform;
 }
 
+void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
+
+}
+
 void drawGame( SDL_Renderer* renderer, const GameState* gameState ) {
     // background
     SDL_SetRenderDrawColor( renderer, 0xFF, 0x00, 0x00, 0xFF );
@@ -157,7 +162,20 @@ void mainLoop( SDL_Renderer* renderer ) {
     QuadBlock block0 = { 0, 0 };
     gameState.blocks.push_back( block0 );
 
+    std::chrono::duration<double> tSeconds( 0.0 );
+    std::chrono::duration<double> dtSeconds( 0.01 );
+    std::chrono::time_point<std::chrono::high_resolution_clock> lastTime = std::chrono::high_resolution_clock::now();
+    std::chrono::time_point<std::chrono::high_resolution_clock> newTime;
+    std::chrono::duration<double> accumulator( 0.0 );
+    std::chrono::duration<double> frameTime;
+
     while ( !quit ) {
+        newTime = std::chrono::high_resolution_clock::now();
+        frameTime = newTime - lastTime;
+        lastTime = newTime;
+
+        accumulator += frameTime;
+
         // Input handling
         while ( SDL_PollEvent( &e ) != 0 ) {
             if ( e.type == SDL_QUIT ) {
@@ -184,6 +202,12 @@ void mainLoop( SDL_Renderer* renderer ) {
                         break;
                 }
             }
+        }
+
+        while ( accumulator >= dtSeconds ) {
+            updateGame( &gameState, dtSeconds );
+            accumulator -= dtSeconds;
+            tSeconds += dtSeconds;
         }
 
         drawGame( renderer, &gameState );
