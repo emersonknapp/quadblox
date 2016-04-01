@@ -41,9 +41,9 @@ target_link_libraries(${PROJECT_NAME} ${LINK_LIBS})
 
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${BIN_DIR})
 
-#add_custom_target(postbuild ALL)
+add_custom_target(postbuild ALL)
 #if (WIN32)
     #add_custom_command(TARGET postbuild POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GLEW_DIR}/bin/Release/Win32/glew32.dll $<TARGET_FILE_DIR:${PROJECT_NAME}>/)
 #endif()
 
-#add_custom_command(TARGET postbuild POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets)
+add_custom_command(TARGET postbuild POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets ${BIN_DIR}/assets)
