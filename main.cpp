@@ -39,15 +39,16 @@ SDL_Texture* loadTexture( const char* path, SDL_Renderer* renderer ) {
 }
 
 struct QuadBlock {
-    QuadBlock( int x, int y ) : x(x), y(y), landed(false) {}
+    QuadBlock( int x, int y ) : x(x), y(y), landed(false), horizMove(0) {}
     int x;
     int y;
     bool landed;
+    int horizMove;
 };
 
 typedef struct GameState {
     std::chrono::duration<double> timeSinceLastFall = std::chrono::duration<double>( 0.0 );
-    std::chrono::duration<double> fallsPerSecond = std::chrono::duration<double>( 1.0 );
+    std::chrono::duration<double> timePerFall = std::chrono::duration<double>( 0.7 );
     QuadBlock currentBlock = QuadBlock( 0, 0 );
     std::vector<QuadBlock> blocks;
 } GameState;
@@ -129,10 +130,19 @@ void shutdownSDL( Platform* platform ) {
 
 void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
     gameState->timeSinceLastFall += dt;
-    if ( gameState->timeSinceLastFall > gameState->fallsPerSecond ) {
-        gameState->timeSinceLastFall -= gameState->fallsPerSecond;
 
-        QuadBlock& qb = gameState->currentBlock;
+    QuadBlock& qb = gameState->currentBlock;
+
+    // Horizontal motion
+    qb.x += qb.horizMove;
+    qb.horizMove = 0;
+    if ( qb.x <= 0 ) qb.x = 0;
+    if ( qb.x >= PLAYAREA_WIDTH - 1 ) qb.x = PLAYAREA_WIDTH - 1;
+
+    // Vertical Motion
+    if ( gameState->timeSinceLastFall > gameState->timePerFall ) {
+        gameState->timeSinceLastFall -= gameState->timePerFall;
+
         qb.y += 1;
         if ( qb.y >= (PLAYAREA_HEIGHT - 1) ) {
             qb.landed = true;
@@ -141,7 +151,6 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
             gameState->blocks.push_back( gameState->currentBlock );
             gameState->currentBlock = QuadBlock( 0, 0 );
         }
-
     }
 }
 
@@ -203,16 +212,14 @@ void mainLoop( SDL_Renderer* renderer ) {
             } else if ( e.type == SDL_KEYDOWN ) {
                 switch ( e.key.keysym.sym ) {
                     case SDLK_UP:
-                        printf( "UP\n" );
                         break;
                     case SDLK_DOWN:
-                        printf( "DOWN\n" );
                         break;
                     case SDLK_LEFT:
-                        printf( "LEFT\n" );
+                        gameState.currentBlock.horizMove -= 1;
                         break;
                     case SDLK_RIGHT:
-                        printf( "RIGHT\n" );
+                        gameState.currentBlock.horizMove += 1;
                         break;
                     case SDLK_q:
                     case SDLK_ESCAPE:
