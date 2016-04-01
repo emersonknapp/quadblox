@@ -149,7 +149,7 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
         }
         if ( qb.landed ) {
             gameState->blocks.push_back( gameState->currentBlock );
-            gameState->currentBlock = QuadBlock( 0, 0 );
+            gameState->currentBlock = QuadBlock( rand() % 10, 0 );
         }
     }
 }
