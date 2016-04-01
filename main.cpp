@@ -2,6 +2,7 @@
 #include "SDL_image.h"
 
 #include <vector>
+#include <queue>
 #include <chrono>
 
 const int SCREEN_WIDTH = 640;
@@ -39,11 +40,9 @@ SDL_Texture* loadTexture( const char* path, SDL_Renderer* renderer ) {
 }
 
 struct QuadBlock {
-    QuadBlock( int x, int y ) : x(x), y(y), landed(false), horizMove(0) {}
+    QuadBlock( int x, int y ) : x(x), y(y) {}
     int x;
     int y;
-    bool landed;
-    int horizMove;
 };
 
 typedef struct GameState {
@@ -51,6 +50,8 @@ typedef struct GameState {
     std::chrono::duration<double> timePerFall = std::chrono::duration<double>( 0.7 );
     QuadBlock currentBlock = QuadBlock( 0, 0 );
     std::vector<QuadBlock> blocks;
+    int horizMove = 0;
+    bool wantsToQuit = false;
 } GameState;
 
 typedef struct Platform {
@@ -128,14 +129,15 @@ void shutdownSDL( Platform* platform ) {
     delete platform;
 }
 
+
 void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
     gameState->timeSinceLastFall += dt;
 
     QuadBlock& qb = gameState->currentBlock;
 
     // Horizontal motion
-    qb.x += qb.horizMove;
-    qb.horizMove = 0;
+    qb.x += gameState->horizMove;
+    gameState->horizMove = 0;
     if ( qb.x <= 0 ) qb.x = 0;
     if ( qb.x >= PLAYAREA_WIDTH - 1 ) qb.x = PLAYAREA_WIDTH - 1;
 
@@ -144,10 +146,7 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
         gameState->timeSinceLastFall -= gameState->timePerFall;
 
         qb.y += 1;
-        if ( qb.y >= (PLAYAREA_HEIGHT - 1) ) {
-            qb.landed = true;
-        }
-        if ( qb.landed ) {
+        if ( qb.y >= (PLAYAREA_HEIGHT - 1)  ) {
             gameState->blocks.push_back( gameState->currentBlock );
             gameState->currentBlock = QuadBlock( rand() % 10, 0 );
         }
@@ -185,20 +184,34 @@ void drawGame( SDL_Renderer* renderer, const GameState* gameState ) {
     SDL_RenderPresent( renderer );
 }
 
+void gameInputHandler( GameState* gameState, SDL_KeyboardEvent key ) {
+    switch ( key.keysym.sym ) {
+        case SDLK_LEFT:
+            gameState->horizMove -= 1;
+            break;
+        case SDLK_RIGHT:
+            gameState->horizMove += 1;
+            break;
+        case SDLK_q:
+        case SDLK_ESCAPE:
+            gameState->wantsToQuit = true;
+            break;
+    }
+}
+
 void mainLoop( SDL_Renderer* renderer ) {
-    bool quit = false;
     SDL_Event e;
 
     GameState gameState;
 
-    std::chrono::duration<double> tSeconds( 0.0 );
-    std::chrono::duration<double> dtSeconds( 0.01 );
+    std::chrono::duration<double>                               tSeconds( 0.0 );
+    std::chrono::duration<double>                               dtSeconds( 0.01 );
     std::chrono::time_point<std::chrono::high_resolution_clock> lastTime = std::chrono::high_resolution_clock::now();
     std::chrono::time_point<std::chrono::high_resolution_clock> newTime;
-    std::chrono::duration<double> accumulator( 0.0 );
-    std::chrono::duration<double> frameTime;
+    std::chrono::duration<double>                               accumulator( 0.0 );
+    std::chrono::duration<double>                               frameTime;
 
-    while ( !quit ) {
+    while ( !gameState.wantsToQuit ) {
         newTime = std::chrono::high_resolution_clock::now();
         frameTime = newTime - lastTime;
         lastTime = newTime;
@@ -208,26 +221,9 @@ void mainLoop( SDL_Renderer* renderer ) {
         // Input handling
         while ( SDL_PollEvent( &e ) != 0 ) {
             if ( e.type == SDL_QUIT ) {
-                quit = true;
+                break;
             } else if ( e.type == SDL_KEYDOWN ) {
-                switch ( e.key.keysym.sym ) {
-                    case SDLK_UP:
-                        break;
-                    case SDLK_DOWN:
-                        break;
-                    case SDLK_LEFT:
-                        gameState.currentBlock.horizMove -= 1;
-                        break;
-                    case SDLK_RIGHT:
-                        gameState.currentBlock.horizMove += 1;
-                        break;
-                    case SDLK_q:
-                    case SDLK_ESCAPE:
-                        quit = true;
-                        break;
-                    default:
-                        break;
-                }
+                gameInputHandler( &gameState, e.key );
             }
         }
 
@@ -236,12 +232,8 @@ void mainLoop( SDL_Renderer* renderer ) {
             accumulator -= dtSeconds;
             tSeconds += dtSeconds;
         }
-
         drawGame( renderer, &gameState );
     }
-
-
-
 }
 
 int main( int /*argc*/, char** /*argv*/ ) {
