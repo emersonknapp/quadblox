@@ -8,11 +8,11 @@
 
 #include <stdint.h>
 
-const int SCREEN_WIDTH = 640;
-const int SCREEN_HEIGHT = 480;
+const int SCREEN_WIDTH = 960;
+const int SCREEN_HEIGHT = 960;
 
 const int PLAYAREA_WIDTH = 10;
-const int PLAYAREA_HEIGHT = 10;
+const int PLAYAREA_HEIGHT = 20;
 
 const int NUM_BLOCKTYPES = 7;
 const int NUM_BLOCKSTATES = 4;
@@ -151,9 +151,9 @@ typedef struct Assets {
 Assets* loadMedia( SDL_Renderer* renderer ) {
     bool success = true;
     Assets* assets = new Assets();
-    char path[14] = "assets/00.png";
+    char path[18] = "assets/Block0.png";
     for ( int i = 0; i < NUM_BLOCKTYPES; i++ ) {
-        sprintf( path, "assets/%02d.png", i );
+        sprintf( path, "assets/Block%01d.png", i + 1 );
         assets->blockTextures[i] = loadTexture( path, renderer );
         if ( assets->blockTextures[i] == NULL ) {
             printf( "Failed to load texture %s\n", path );
@@ -300,13 +300,14 @@ void drawBlock( SDL_Renderer* renderer, const Assets* assets, const QuadBlock& q
 
 void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* gameState ) {
     // background
-    SDL_SetRenderDrawColor( renderer, 0xFF, 0x00, 0x00, 0xFF );
+    SDL_SetRenderDrawColor( renderer, 0x99, 0xA0, 0x99, 0xFF );
     SDL_RenderClear( renderer );
 
     // Game area
-    int gameAreaWidth = 3 * SCREEN_WIDTH / 4;
-    int gameAreaHeight = SCREEN_HEIGHT;
-    SDL_Rect gameAreaViewport = Rect( 0, 0, gameAreaWidth, gameAreaHeight );
+    int gameAreaHeight = SCREEN_HEIGHT * 0.8;
+    gameAreaHeight = gameAreaHeight - ( gameAreaHeight % PLAYAREA_HEIGHT );
+    int gameAreaWidth = gameAreaHeight / 2; 
+    SDL_Rect gameAreaViewport = Rect( 0.1 * SCREEN_HEIGHT, 0.1 * SCREEN_WIDTH, gameAreaWidth, gameAreaHeight );
     SDL_RenderSetViewport( renderer, &gameAreaViewport );
     SDL_SetRenderDrawColor( renderer, 0xCC, 0xCC, 0xCC, 0xFF );
     SDL_Rect gameAreaBackground = Rect( 0, 0, gameAreaWidth, gameAreaHeight );
