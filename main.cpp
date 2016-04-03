@@ -74,8 +74,7 @@ struct QuadBlock {
 
         //Fit to top, in case of empty-top
         y = -top();
-        //x = ( rand() % ( PLAYAREA_WIDTH + left() + right() ) ) - left();
-        x = -left();
+        x = ( rand() % ( PLAYAREA_WIDTH + left() + right() ) ) - left();
     }
 
     void rotate() {
