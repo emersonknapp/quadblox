@@ -146,6 +146,7 @@ typedef struct GameState {
 typedef struct Assets {
     static const int numBlockTextures = 7;
     SDL_Texture* blockTextures[ numBlockTextures ];
+    SDL_Texture* backgroundTexture = NULL;
 } Assets;
 
 Assets* loadMedia( SDL_Renderer* renderer ) {
@@ -161,6 +162,11 @@ Assets* loadMedia( SDL_Renderer* renderer ) {
             break;
         }
     }
+    assets->backgroundTexture = loadTexture( "assets/BG.png", renderer );
+    if ( assets->backgroundTexture == NULL ) {
+        printf( "Failed to load texture assets/BG.png\n");
+        success = false;
+    }
 
     if ( !success ) {
         delete assets;
@@ -174,6 +180,8 @@ void freeMedia( Assets* assets ) {
         SDL_DestroyTexture( assets->blockTextures[i] );
         assets->blockTextures[i] = NULL;
     }
+    SDL_DestroyTexture( assets->backgroundTexture );
+    assets->backgroundTexture = NULL;
 }
 
 typedef struct Platform {
@@ -311,7 +319,7 @@ void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* ga
     SDL_RenderSetViewport( renderer, &gameAreaViewport );
     SDL_SetRenderDrawColor( renderer, 0xCC, 0xCC, 0xCC, 0xFF );
     SDL_Rect gameAreaBackground = Rect( 0, 0, gameAreaWidth, gameAreaHeight );
-    SDL_RenderFillRect( renderer, &gameAreaBackground );
+    SDL_RenderCopy( renderer, assets->backgroundTexture, NULL, &gameAreaBackground );
 
     // Blocks
     int blockWidth = gameAreaWidth / PLAYAREA_WIDTH;
