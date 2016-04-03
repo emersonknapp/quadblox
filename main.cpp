@@ -19,7 +19,7 @@ const int NUM_BLOCKSTATES = 4;
 // Draw each state of each block in a 4x4 grid, represent each grid as a 16-bit int. 1 is square, 0 is no square
 const uint16_t BLOCKS[NUM_BLOCKTYPES][NUM_BLOCKSTATES] = {
     {0x08E0, 0x0644, 0x00E2, 0x044C}, //Reverse L
-    {0x02E0, 0x0C44, 0x00E8, 0x0446}, //L
+    {0x02E0, 0x0446, 0x00E8, 0x0C44}, //L
     {0x06C0, 0x0462, 0x006C, 0x08C4}, //S
     {0x00C6, 0x04C8, 0x0C60, 0x0264}, //Z
     {0x0660, 0x0660, 0x0660, 0x0660}, //Square
@@ -30,7 +30,7 @@ const uint16_t BLOCKS[NUM_BLOCKTYPES][NUM_BLOCKSTATES] = {
 // Convenience helper to check if there are any blocks in a column, for spawning fully on the play area.
 // 4 columns in 4 states gives one 16-bit int per block type
 const uint16_t BLOCKS_COL[NUM_BLOCKTYPES] = {
-    0xE6EC, 0xECE6, 0xE6EC, 0xECE6, 0x6666, 0xCE6E, 0x4F2F
+    0xE6EC, 0xE6EC, 0xE6EC, 0xECE6, 0x6666, 0xCE6E, 0x4F2F
 };
 
 void PrintSDLError( const char* message ) {
@@ -62,24 +62,18 @@ SDL_Texture* loadTexture( const char* path, SDL_Renderer* renderer ) {
 }
 
 int nextBlockType = 0;
-int nextState = 0;
 struct QuadBlock {
     QuadBlock() {
 
-        //currentState = rand() % NUM_BLOCKSTATES;
-        //blockType = rand() % NUM_BLOCKTYPES;
+        currentState = rand() % NUM_BLOCKSTATES;
+        blockType = rand() % NUM_BLOCKTYPES;
 
         blockType = nextBlockType % NUM_BLOCKTYPES;
-        currentState = nextState % NUM_BLOCKSTATES;
-
-        nextState++;
-        if ( nextState > ( NUM_BLOCKSTATES - 1 ) ) {
-            nextState = 0;
-            nextBlockType++;
-        }
+        currentState = 0;;
+        nextBlockType++;
 
         state = BLOCKS[blockType][currentState];
-        cols = ( BLOCKS_COL[blockType] >> ( ( 4 - currentState - 1 ) * 4 ) ) & 0xF;
+        cols = getCols();
 
         //Fit to top, in case of empty-top
         y = -top();
@@ -88,12 +82,12 @@ struct QuadBlock {
     }
 
     void rotate() {
-        currentState++;
+        currentState = ( currentState + 1 ) % NUM_BLOCKSTATES;
         state = BLOCKS[blockType][currentState];
-        cols = ( BLOCKS_COL[blockType] >> ( ( 4 - currentState ) * 4 ) ) & 0xF;
+        cols = getCols();
     }
 
-    int left() {
+    int left() const {
         int emptyLeft = 0;
         for ( int i = 3; i >= 0; i-- ) {
             if ( ( ( cols >> i ) & 1 ) == 0 ) emptyLeft++;
@@ -102,7 +96,7 @@ struct QuadBlock {
         return emptyLeft;
     }
 
-    int right() {
+    int right() const {
         int emptyRight = 0;
         for ( int i = 0; i < 4; i++ ) {
             if ( ( ( cols >> i ) & 1 ) == 0 ) emptyRight++;
@@ -111,7 +105,7 @@ struct QuadBlock {
         return emptyRight;
     }
 
-    int top() {
+    int top() const {
         int emptyTop = 0;
         for ( int i = 12; i >= 0; i -= 4 ) {
             if ( ( ( state >> i ) & 0xF ) == 0 ) emptyTop++;
@@ -120,13 +114,17 @@ struct QuadBlock {
         return emptyTop;
     }
 
-    int bottom() {
+    int bottom() const {
         int emptyBottom = 0;
         for ( int i = 0; i < 16; i += 4 ) {
             if ( ( ( state >> i ) & 0xF ) == 0 ) emptyBottom++;
             else break;
         }
         return emptyBottom;
+    }
+
+    uint8_t getCols() const {
+        return ( BLOCKS_COL[blockType] >> ( ( 4 - currentState - 1 ) * 4 ) ) & 0xF;
     }
 
     int x;
@@ -139,10 +137,11 @@ struct QuadBlock {
 
 typedef struct GameState {
     std::chrono::duration<double> timeSinceLastFall = std::chrono::duration<double>( 0.0 );
-    std::chrono::duration<double> timePerFall = std::chrono::duration<double>( 0.3 );
+    std::chrono::duration<double> timePerFall = std::chrono::duration<double>( 1.0 );
     QuadBlock currentBlock = QuadBlock();
     std::vector<QuadBlock> blocks;
     int horizMove = 0;
+    int rotate = 0;
     bool wantsToQuit = false;
     bool paused = false;
 } GameState;
@@ -235,6 +234,11 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
     qb.x += gameState->horizMove;
     gameState->horizMove = 0;
 
+    for ( int i = 0; i < gameState->rotate; i++ ) {
+        qb.rotate();
+    }
+    gameState->rotate = 0;
+
     if ( qb.x <= -qb.left() ) qb.x = -qb.left();
     if ( qb.x >= PLAYAREA_WIDTH - 4 + qb.right() ) qb.x = PLAYAREA_WIDTH - 4 + qb.right();
 
@@ -304,6 +308,9 @@ void gameInputHandler( GameState* gameState, SDL_KeyboardEvent key ) {
             break;
         case SDLK_RIGHT:
             gameState->horizMove += 1;
+            break;
+        case SDLK_UP:
+            gameState->rotate += 1;
             break;
         case SDLK_q:
         case SDLK_ESCAPE:
