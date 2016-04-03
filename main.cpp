@@ -5,11 +5,33 @@
 #include <queue>
 #include <chrono>
 
+#include <stdint.h>
+
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
 
 const int PLAYAREA_WIDTH = 10;
 const int PLAYAREA_HEIGHT = 10;
+
+const int NUM_BLOCKTYPES = 7;
+const int NUM_BLOCKSTATES = 4;
+
+// Draw each state of each block in a 4x4 grid, represent each grid as a 16-bit int. 1 is square, 0 is no square
+const uint16_t BLOCKS[NUM_BLOCKTYPES][NUM_BLOCKSTATES] = {
+    {0x08E0, 0x0644, 0x00E2, 0x044C}, //Reverse L
+    {0x02E0, 0x0C44, 0x00E8, 0x0446}, //L
+    {0x06C0, 0x0462, 0x006C, 0x08C4}, //S
+    {0x00C6, 0x04C8, 0x0C60, 0x0264}, //Z
+    {0x0660, 0x0660, 0x0660, 0x0660}, //Square
+    {0x04C4, 0x04E0, 0x0464, 0x00E4}, //T
+    {0x4444, 0x0F00, 0x2222, 0x00F0} //Line
+};
+
+// Convenience helper to check if there are any blocks in a column, for spawning fully on the play area.
+// 4 columns in 4 states gives one 16-bit int per block type
+const uint16_t BLOCKS_COL[NUM_BLOCKTYPES] = {
+    0xE6EC, 0xECE6, 0xE6EC, 0xECE6, 0x6666, 0xCE6E, 0x4F2F
+};
 
 void PrintSDLError( const char* message ) {
     printf("%s Error: %s\n", message, SDL_GetError());
@@ -39,19 +61,90 @@ SDL_Texture* loadTexture( const char* path, SDL_Renderer* renderer ) {
     return newTexture;
 }
 
+int nextBlockType = 0;
+int nextState = 0;
 struct QuadBlock {
-    QuadBlock( int x, int y ) : x(x), y(y) {}
+    QuadBlock() {
+
+        //currentState = rand() % NUM_BLOCKSTATES;
+        //blockType = rand() % NUM_BLOCKTYPES;
+
+        blockType = nextBlockType % NUM_BLOCKTYPES;
+        currentState = nextState % NUM_BLOCKSTATES;
+
+        nextState++;
+        if ( nextState > ( NUM_BLOCKSTATES - 1 ) ) {
+            nextState = 0;
+            nextBlockType++;
+        }
+
+        state = BLOCKS[blockType][currentState];
+        cols = ( BLOCKS_COL[blockType] >> ( ( 4 - currentState - 1 ) * 4 ) ) & 0xF;
+
+        //Fit to top, in case of empty-top
+        y = -top();
+        //x = ( rand() % ( PLAYAREA_WIDTH + left() + right() ) ) - left();
+        x = -left();
+    }
+
+    void rotate() {
+        currentState++;
+        state = BLOCKS[blockType][currentState];
+        cols = ( BLOCKS_COL[blockType] >> ( ( 4 - currentState ) * 4 ) ) & 0xF;
+    }
+
+    int left() {
+        int emptyLeft = 0;
+        for ( int i = 3; i >= 0; i-- ) {
+            if ( ( ( cols >> i ) & 1 ) == 0 ) emptyLeft++;
+            else break;
+        }
+        return emptyLeft;
+    }
+
+    int right() {
+        int emptyRight = 0;
+        for ( int i = 0; i < 4; i++ ) {
+            if ( ( ( cols >> i ) & 1 ) == 0 ) emptyRight++;
+            else break;
+        }
+        return emptyRight;
+    }
+
+    int top() {
+        int emptyTop = 0;
+        for ( int i = 12; i >= 0; i -= 4 ) {
+            if ( ( ( state >> i ) & 0xF ) == 0 ) emptyTop++;
+            else break;
+        }
+        return emptyTop;
+    }
+
+    int bottom() {
+        int emptyBottom = 0;
+        for ( int i = 0; i < 16; i += 4 ) {
+            if ( ( ( state >> i ) & 0xF ) == 0 ) emptyBottom++;
+            else break;
+        }
+        return emptyBottom;
+    }
+
     int x;
     int y;
+    int blockType;
+    int currentState;
+    uint16_t state;
+    uint8_t cols;
 };
 
 typedef struct GameState {
     std::chrono::duration<double> timeSinceLastFall = std::chrono::duration<double>( 0.0 );
-    std::chrono::duration<double> timePerFall = std::chrono::duration<double>( 0.7 );
-    QuadBlock currentBlock = QuadBlock( 0, 0 );
+    std::chrono::duration<double> timePerFall = std::chrono::duration<double>( 0.3 );
+    QuadBlock currentBlock = QuadBlock();
     std::vector<QuadBlock> blocks;
     int horizMove = 0;
     bool wantsToQuit = false;
+    bool paused = false;
 } GameState;
 
 typedef struct Platform {
@@ -129,8 +222,11 @@ void shutdownSDL( Platform* platform ) {
     delete platform;
 }
 
-
 void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
+    if ( gameState->paused ) {
+        return;
+    }
+
     gameState->timeSinceLastFall += dt;
 
     QuadBlock& qb = gameState->currentBlock;
@@ -138,24 +234,41 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
     // Horizontal motion
     qb.x += gameState->horizMove;
     gameState->horizMove = 0;
-    if ( qb.x <= 0 ) qb.x = 0;
-    if ( qb.x >= PLAYAREA_WIDTH - 1 ) qb.x = PLAYAREA_WIDTH - 1;
+
+    if ( qb.x <= -qb.left() ) qb.x = -qb.left();
+    if ( qb.x >= PLAYAREA_WIDTH - 4 + qb.right() ) qb.x = PLAYAREA_WIDTH - 4 + qb.right();
 
     // Vertical Motion
     if ( gameState->timeSinceLastFall > gameState->timePerFall ) {
         gameState->timeSinceLastFall -= gameState->timePerFall;
 
-        qb.y += 1;
-        if ( qb.y >= (PLAYAREA_HEIGHT - 1)  ) {
+        int newY = qb.y + 1;
+        if ( newY >= ( PLAYAREA_HEIGHT - 4 + qb.bottom() + 1 ) ) {
+            if ( gameState->blocks.size() > 0 ) gameState->blocks.pop_back();
             gameState->blocks.push_back( gameState->currentBlock );
-            gameState->currentBlock = QuadBlock( rand() % 10, 0 );
+            gameState->currentBlock = QuadBlock();
+        } else {
+            qb.y = newY;
         }
     }
 }
 
 void drawBlock( SDL_Renderer* renderer, const QuadBlock& qb, int w, int h ) {
-    SDL_Rect blockRect = Rect( qb.x * w, qb.y * h, w, h );
-    SDL_RenderFillRect( renderer, &blockRect );
+    SDL_Rect blockRect;
+    int blocksDrawn = 0;
+    for ( int i = 0; i < 4; i++ ) {
+        int row = ( qb.state >> ( 4 * ( 4 - i - 1 ) ) ) & 0xF;
+
+        for ( int j = 0; j < 4; j++ ) {
+            int square = row >> ( 4 - j - 1 ) & 1;
+
+            if ( square ) {
+                blockRect = Rect( ( qb.x + j ) * w, ( qb.y + i ) * h, w, h );
+                SDL_RenderFillRect( renderer, &blockRect );
+                blocksDrawn++;
+            }
+        }
+    }
 }
 
 void drawGame( SDL_Renderer* renderer, const GameState* gameState ) {
@@ -195,6 +308,11 @@ void gameInputHandler( GameState* gameState, SDL_KeyboardEvent key ) {
         case SDLK_q:
         case SDLK_ESCAPE:
             gameState->wantsToQuit = true;
+            break;
+        case SDLK_p:
+            gameState->paused = !gameState->paused;
+            break;
+        default:
             break;
     }
 }
