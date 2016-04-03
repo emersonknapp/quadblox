@@ -65,7 +65,6 @@ SDL_Texture* loadTexture( const char* path, SDL_Renderer* renderer ) {
 
 struct QuadBlock {
     QuadBlock() {
-
         currentState = rand() % NUM_BLOCKSTATES;
         blockType = rand() % NUM_BLOCKTYPES;
 
@@ -143,6 +142,11 @@ typedef struct GameState {
     bool turbo = false;
 } GameState;
 
+typedef struct Assets {
+    static const int numBlockTextures = 7;
+    SDL_Texture* blockTextures[ numBlockTextures ];
+} Assets;
+
 typedef struct Platform {
     SDL_Window* window = NULL;
     SDL_Renderer* renderer = NULL;
@@ -150,16 +154,25 @@ typedef struct Platform {
 
 
 
-bool loadMedia(SDL_Renderer* /*renderer*/) {
+Assets* loadMedia( SDL_Renderer* renderer ) {
     bool success = true;
-    /*
-    gTexture = loadTexture( "assets/03.png", renderer );
-    if ( gTexture == NULL ) {
-        printf( "Failed to load texture image!\n" );
-        success = false;
+    Assets* assets = new Assets();
+    char path[14] = "assets/00.png";
+    for ( int i = 0; i < NUM_BLOCKTYPES; i++ ) {
+        sprintf( path, "assets/%02d.png", i );
+        assets->blockTextures[i] = loadTexture( path, renderer );
+        if ( assets->blockTextures[i] == NULL ) {
+            printf( "Failed to load texture %s\n", path );
+            success = false;
+            break;
+        }
     }
-    */
-    return success;
+
+    if ( !success ) {
+        delete assets;
+        assets = NULL;
+    }
+    return assets;
 }
 
 Platform* initSDL() {
@@ -205,9 +218,6 @@ Platform* initSDL() {
 }
 
 void shutdownSDL( Platform* platform ) {
-    //SDL_DestroyTexture( gTexture );
-    //gTexture = NULL;
-
     SDL_DestroyRenderer( platform->renderer );
     platform->renderer = NULL;
     SDL_DestroyWindow( platform->window );
@@ -266,25 +276,24 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
     }
 }
 
-void drawBlock( SDL_Renderer* renderer, const QuadBlock& qb, int w, int h ) {
+void drawBlock( SDL_Renderer* renderer, const Assets* assets, const QuadBlock& qb, int w, int h ) {
     SDL_Rect blockRect;
     int blocksDrawn = 0;
     for ( int i = 0; i < 4; i++ ) {
         int row = ( qb.state >> ( 4 * ( 4 - i - 1 ) ) ) & 0xF;
-
         for ( int j = 0; j < 4; j++ ) {
             int square = row >> ( 4 - j - 1 ) & 1;
-
             if ( square ) {
                 blockRect = Rect( ( qb.x + j ) * w, ( qb.y + i ) * h, w, h );
-                SDL_RenderFillRect( renderer, &blockRect );
+                SDL_RenderCopy( renderer, assets->blockTextures[qb.blockType], NULL, &blockRect );
+                //SDL_RenderFillRect( renderer, &blockRect );
                 blocksDrawn++;
             }
         }
     }
 }
 
-void drawGame( SDL_Renderer* renderer, const GameState* gameState ) {
+void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* gameState ) {
     // background
     SDL_SetRenderDrawColor( renderer, 0xFF, 0x00, 0x00, 0xFF );
     SDL_RenderClear( renderer );
@@ -301,10 +310,9 @@ void drawGame( SDL_Renderer* renderer, const GameState* gameState ) {
     // Blocks
     int blockWidth = gameAreaWidth / PLAYAREA_WIDTH;
     int blockHeight = gameAreaHeight / PLAYAREA_HEIGHT;
-    SDL_SetRenderDrawColor( renderer, 0x00, 0xAA, 0xAA, 0xFF );
-    drawBlock( renderer, gameState->currentBlock, blockWidth, blockHeight );
+    drawBlock( renderer, assets, gameState->currentBlock, blockWidth, blockHeight );
     for ( const QuadBlock& qb : gameState->blocks ) {
-        drawBlock( renderer, qb, blockWidth, blockHeight );
+        drawBlock( renderer, assets, qb, blockWidth, blockHeight );
     }
 
     SDL_RenderPresent( renderer );
@@ -346,7 +354,14 @@ void gameKeyupHandler( GameState* gameState, SDL_KeyboardEvent key ) {
     }
 }
 
-void mainLoop( SDL_Renderer* renderer ) {
+void freeMedia( Assets* assets ) {
+    for ( int i = 0; i < assets->numBlockTextures; i++ ) {
+        SDL_DestroyTexture( assets->blockTextures[i] );
+        assets->blockTextures[i] = NULL;
+    }
+}
+
+void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
     SDL_Event e;
 
     GameState gameState;
@@ -381,22 +396,25 @@ void mainLoop( SDL_Renderer* renderer ) {
             accumulator -= dtSeconds;
             tSeconds += dtSeconds;
         }
-        drawGame( renderer, &gameState );
+        drawGame( renderer, assets, &gameState );
     }
 }
 
 int main( int /*argc*/, char** /*argv*/ ) {
     Platform* platform = initSDL();
+    Assets* assets = NULL;
     if ( platform == NULL ) {
         printf( "Failed to initialize\n" );
     } else {
-        if ( !loadMedia( platform->renderer ) ) {
+        assets = loadMedia( platform->renderer );
+        if ( assets == NULL ) {
             printf( "Failed to load media\n" );
         } else {
-            mainLoop(platform->renderer);
+            mainLoop( platform->renderer, assets );
         }
     }
 
+    freeMedia( assets );
     shutdownSDL( platform );
     return 0;
 }
