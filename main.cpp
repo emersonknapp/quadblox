@@ -16,6 +16,8 @@ const int PLAYAREA_HEIGHT = 10;
 const int NUM_BLOCKTYPES = 7;
 const int NUM_BLOCKSTATES = 4;
 
+const int TURBOFACTOR = 8;
+
 // Draw each state of each block in a 4x4 grid, represent each grid as a 16-bit int. 1 is square, 0 is no square
 const uint16_t BLOCKS[NUM_BLOCKTYPES][NUM_BLOCKSTATES] = {
     {0x08E0, 0x0644, 0x00E2, 0x044C}, //Reverse L
@@ -61,16 +63,11 @@ SDL_Texture* loadTexture( const char* path, SDL_Renderer* renderer ) {
     return newTexture;
 }
 
-int nextBlockType = 0;
 struct QuadBlock {
     QuadBlock() {
 
         currentState = rand() % NUM_BLOCKSTATES;
         blockType = rand() % NUM_BLOCKTYPES;
-
-        blockType = nextBlockType % NUM_BLOCKTYPES;
-        currentState = 0;;
-        nextBlockType++;
 
         state = BLOCKS[blockType][currentState];
         cols = getCols();
@@ -144,6 +141,7 @@ typedef struct GameState {
     int rotate = 0;
     bool wantsToQuit = false;
     bool paused = false;
+    bool turbo = false;
 } GameState;
 
 typedef struct Platform {
@@ -239,18 +237,30 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
     }
     gameState->rotate = 0;
 
+    int realBottom = PLAYAREA_HEIGHT - 4 + qb.bottom() + 1;
+    // Rotation can put our asses through the floor
+    if ( qb.y >= realBottom - 1 ) {
+        qb.y = realBottom - 1;
+    }
+
     if ( qb.x <= -qb.left() ) qb.x = -qb.left();
     if ( qb.x >= PLAYAREA_WIDTH - 4 + qb.right() ) qb.x = PLAYAREA_WIDTH - 4 + qb.right();
 
     // Vertical Motion
-    if ( gameState->timeSinceLastFall > gameState->timePerFall ) {
-        gameState->timeSinceLastFall -= gameState->timePerFall;
+    auto timePerFall = gameState->timePerFall;
+    if ( gameState->turbo ) {
+        timePerFall /= TURBOFACTOR;
+    }
+    if ( gameState->timeSinceLastFall > timePerFall ) {
+        //TODO: this is not fully correct. BUT, we don't want accumulated time from a full-length fall to cause multiple blocks fallage in a row
+        gameState->timeSinceLastFall -= gameState->timeSinceLastFall;
 
         int newY = qb.y + 1;
-        if ( newY >= ( PLAYAREA_HEIGHT - 4 + qb.bottom() + 1 ) ) {
+        if ( newY >= realBottom ) {
             if ( gameState->blocks.size() > 0 ) gameState->blocks.pop_back();
             gameState->blocks.push_back( gameState->currentBlock );
             gameState->currentBlock = QuadBlock();
+            gameState->turbo = false;
         } else {
             qb.y = newY;
         }
@@ -301,7 +311,7 @@ void drawGame( SDL_Renderer* renderer, const GameState* gameState ) {
     SDL_RenderPresent( renderer );
 }
 
-void gameInputHandler( GameState* gameState, SDL_KeyboardEvent key ) {
+void gameKeydownHandler( GameState* gameState, SDL_KeyboardEvent key ) {
     switch ( key.keysym.sym ) {
         case SDLK_LEFT:
             gameState->horizMove -= 1;
@@ -312,12 +322,25 @@ void gameInputHandler( GameState* gameState, SDL_KeyboardEvent key ) {
         case SDLK_UP:
             gameState->rotate += 1;
             break;
+        case SDLK_DOWN:
+            gameState->turbo = true;
+            break;
         case SDLK_q:
         case SDLK_ESCAPE:
             gameState->wantsToQuit = true;
             break;
         case SDLK_p:
             gameState->paused = !gameState->paused;
+            break;
+        default:
+            break;
+    }
+}
+
+void gameKeyupHandler( GameState* gameState, SDL_KeyboardEvent key ) {
+    switch ( key.keysym.sym ) {
+        case SDLK_DOWN:
+            gameState->turbo = false;
             break;
         default:
             break;
@@ -348,7 +371,9 @@ void mainLoop( SDL_Renderer* renderer ) {
             if ( e.type == SDL_QUIT ) {
                 break;
             } else if ( e.type == SDL_KEYDOWN ) {
-                gameInputHandler( &gameState, e.key );
+                gameKeydownHandler( &gameState, e.key );
+            } else if ( e.type == SDL_KEYUP ) {
+                gameKeyupHandler( &gameState, e.key );
             }
         }
 
