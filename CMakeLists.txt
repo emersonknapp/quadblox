@@ -14,6 +14,10 @@ find_package(SDL2_Image REQUIRED)
 include_directories(${SDL2_IMAGE_INCLUDE_DIR})
 list(APPEND LINK_LIBS ${SDL2_IMAGE_LIBRARIES})
 
+find_package(SDL2_ttf REQUIRED)
+include_directories(${SDL2_TTF_INCLUDE_DIR})
+list(APPEND LINK_LIBS ${SDL2_TTF_LIBRARIES})
+
 set(BIN_DIR "${SOURCE_DIR}/bin")
 
 #### Application ####

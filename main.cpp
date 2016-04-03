@@ -1,5 +1,6 @@
 #include "SDL.h"
 #include "SDL_image.h"
+#include "SDL_ttf.h"
 
 #include <vector>
 #include <queue>
@@ -64,18 +65,6 @@ SDL_Texture* loadTexture( const char* path, SDL_Renderer* renderer ) {
 }
 
 struct QuadBlock {
-    QuadBlock() {
-        currentState = rand() % NUM_BLOCKSTATES;
-        blockType = rand() % NUM_BLOCKTYPES;
-
-        state = BLOCKS[blockType][currentState];
-        cols = getCols();
-
-        //Fit to top, in case of empty-top
-        y = -top();
-        x = ( rand() % ( PLAYAREA_WIDTH + left() + right() ) ) - left();
-    }
-
     void rotate() {
         currentState = ( currentState + 1 ) % NUM_BLOCKSTATES;
         state = BLOCKS[blockType][currentState];
@@ -130,10 +119,22 @@ struct QuadBlock {
     uint8_t cols;
 };
 
+QuadBlock SpawnQuadBlock() {
+    QuadBlock qb;
+    qb.currentState = rand() % NUM_BLOCKSTATES;
+    qb.blockType = rand() % NUM_BLOCKTYPES;
+    qb.state = BLOCKS[qb.blockType][qb.currentState];
+    qb.cols = qb.getCols();
+
+    //Fit to top, in case of empty-top
+    qb.y = -qb.top();
+    qb.x = ( rand() % ( PLAYAREA_WIDTH + qb.left() + qb.right() ) ) - qb.left();
+    return qb;
+}
 typedef struct GameState {
     std::chrono::duration<double> timeSinceLastFall = std::chrono::duration<double>( 0.0 );
     std::chrono::duration<double> timePerFall = std::chrono::duration<double>( 1.0 );
-    QuadBlock currentBlock = QuadBlock();
+    QuadBlock currentBlock = SpawnQuadBlock();
     std::vector<QuadBlock> blocks;
     int horizMove = 0;
     int rotate = 0;
@@ -146,13 +147,6 @@ typedef struct Assets {
     static const int numBlockTextures = 7;
     SDL_Texture* blockTextures[ numBlockTextures ];
 } Assets;
-
-typedef struct Platform {
-    SDL_Window* window = NULL;
-    SDL_Renderer* renderer = NULL;
-} Platform;
-
-
 
 Assets* loadMedia( SDL_Renderer* renderer ) {
     bool success = true;
@@ -174,6 +168,18 @@ Assets* loadMedia( SDL_Renderer* renderer ) {
     }
     return assets;
 }
+
+void freeMedia( Assets* assets ) {
+    for ( int i = 0; i < assets->numBlockTextures; i++ ) {
+        SDL_DestroyTexture( assets->blockTextures[i] );
+        assets->blockTextures[i] = NULL;
+    }
+}
+
+typedef struct Platform {
+    SDL_Window* window = NULL;
+    SDL_Renderer* renderer = NULL;
+} Platform;
 
 Platform* initSDL() {
     bool success = true;
@@ -266,9 +272,8 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
 
         int newY = qb.y + 1;
         if ( newY >= realBottom ) {
-            if ( gameState->blocks.size() > 0 ) gameState->blocks.pop_back();
             gameState->blocks.push_back( gameState->currentBlock );
-            gameState->currentBlock = QuadBlock();
+            gameState->currentBlock = SpawnQuadBlock();
             gameState->turbo = false;
         } else {
             qb.y = newY;
@@ -354,13 +359,6 @@ void gameKeyupHandler( GameState* gameState, SDL_KeyboardEvent key ) {
     }
 }
 
-void freeMedia( Assets* assets ) {
-    for ( int i = 0; i < assets->numBlockTextures; i++ ) {
-        SDL_DestroyTexture( assets->blockTextures[i] );
-        assets->blockTextures[i] = NULL;
-    }
-}
-
 void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
     SDL_Event e;
 
@@ -373,12 +371,18 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
     std::chrono::duration<double>                               accumulator( 0.0 );
     std::chrono::duration<double>                               frameTime;
 
+    std::chrono::duration<double> runningFrameAverage( 0.0 );
+    static const double fpsSmoothing = 0.9;
+    std::chrono::duration<double> currentFPS;
+
     while ( !gameState.wantsToQuit ) {
         newTime = std::chrono::high_resolution_clock::now();
         frameTime = newTime - lastTime;
         lastTime = newTime;
 
         accumulator += frameTime;
+
+        currentFPS = ( currentFPS * fpsSmoothing ) + ( frameTime * ( 1.0 - fpsSmoothing ) );
 
         // Input handling
         while ( SDL_PollEvent( &e ) != 0 ) {
