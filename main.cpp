@@ -107,6 +107,15 @@ struct QuadBlock {
         return emptyBottom;
     }
 
+    int row( int i ) const {
+       return 0xF & ( state >> ( 4 * ( 4 - i - 1 ) ) ); 
+    }
+
+    int square( int r, int c ) const {
+        int irow = row( r );
+        return 1 & ( irow >> ( 4 - c - 1 ) ); 
+    }
+
     uint8_t getCols() const {
         return ( BLOCKS_COL[blockType] >> ( ( 4 - currentState - 1 ) * 4 ) ) & 0xF;
     }
@@ -136,6 +145,7 @@ typedef struct GameState {
     std::chrono::duration<double> timePerFall = std::chrono::duration<double>( 1.0 );
     QuadBlock currentBlock = SpawnQuadBlock();
     std::vector<QuadBlock> blocks;
+    bool blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] = { { 0 } };
     int horizMove = 0;
     int rotate = 0;
     bool wantsToQuit = false;
@@ -240,6 +250,31 @@ void shutdownSDL( Platform* platform ) {
     SDL_Quit();
 
     delete platform;
+}
+
+void finalizeBlock( GameState* gameState, QuadBlock qb ) {
+    gameState->blocks.push_back( qb );
+    memset( gameState->blockBake, 0, sizeof gameState->blockBake );
+
+    for ( const QuadBlock& b : gameState->blocks ) {
+        for ( int i = 0; i < 4; i++ ) {
+            for ( int j = 0; j < 4; j++ ) {
+                int square = b.square( i, j );
+                gameState->blockBake[j][i] |= square; 
+            }
+        }
+    }
+}
+
+bool blockHitsBake( const QuadBlock& qb, const bool blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] ) {
+    for ( int i = 0; i < 4; i++ ) {
+        for ( int j = 0; j < 4; j++ ) {
+            if ( qb.square( i, j ) & blockBake[i+qb.x][j+qb.y] ) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
