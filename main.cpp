@@ -314,8 +314,8 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
         gameState->timeSinceLastFall -= gameState->timeSinceLastFall;
 
         int newY = qb.y + 1;
-        if ( newY >= realBottom ) {
-            gameState->blocks.push_back( gameState->currentBlock );
+        if ( newY >= realBottom ) {// || blockHitsBake( qb, gameState->blockBake ) ) {
+            finalizeBlock( gameState, gameState->currentBlock );
             gameState->currentBlock = SpawnQuadBlock();
             gameState->turbo = false;
         } else {
@@ -328,10 +328,8 @@ void drawBlock( SDL_Renderer* renderer, const Assets* assets, const QuadBlock& q
     SDL_Rect blockRect;
     int blocksDrawn = 0;
     for ( int i = 0; i < 4; i++ ) {
-        int row = ( qb.state >> ( 4 * ( 4 - i - 1 ) ) ) & 0xF;
         for ( int j = 0; j < 4; j++ ) {
-            int square = row >> ( 4 - j - 1 ) & 1;
-            if ( square ) {
+            if ( qb.square( i, j ) ) {
                 blockRect = Rect( ( qb.x + j ) * w, ( qb.y + i ) * h, w, h );
                 SDL_RenderCopy( renderer, assets->blockTextures[qb.blockType], NULL, &blockRect );
                 //SDL_RenderFillRect( renderer, &blockRect );
