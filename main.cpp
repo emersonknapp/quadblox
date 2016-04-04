@@ -259,22 +259,32 @@ void finalizeBlock( GameState* gameState, QuadBlock qb ) {
     for ( const QuadBlock& b : gameState->blocks ) {
         for ( int i = 0; i < 4; i++ ) {
             for ( int j = 0; j < 4; j++ ) {
-                int square = b.square( i, j );
-                gameState->blockBake[j][i] |= square; 
+                int square = b.square( j, i );
+                gameState->blockBake[j + b.y][i + b.x] |= square; 
             }
         }
     }
 }
 
-bool blockHitsBake( const QuadBlock& qb, const bool blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] ) {
+bool blockHitsBake( const QuadBlock& qb, const bool blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH], const int verticalLookahead ) {
     for ( int i = 0; i < 4; i++ ) {
         for ( int j = 0; j < 4; j++ ) {
-            if ( qb.square( i, j ) & blockBake[i+qb.x][j+qb.y] ) {
+            if ( qb.square( j, i ) & blockBake[j + qb.y + verticalLookahead][i + qb.x] ) {
                 return true;
             }
         }
     }
     return false;
+}
+
+void printBake( bool bake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] ) {
+    for ( int i = 0; i < PLAYAREA_HEIGHT; i++ ) {
+        for ( int j = 0; j < PLAYAREA_WIDTH; j++ ) {
+            printf( "%d ", bake[i][j] );    
+        }
+        printf("\n");
+    }
+    printf("\n\n");
 }
 
 void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
@@ -314,7 +324,7 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
         gameState->timeSinceLastFall -= gameState->timeSinceLastFall;
 
         int newY = qb.y + 1;
-        if ( newY >= realBottom ) {// || blockHitsBake( qb, gameState->blockBake ) ) {
+        if ( newY >= realBottom || blockHitsBake( qb, gameState->blockBake, 1 ) ) {
             finalizeBlock( gameState, gameState->currentBlock );
             gameState->currentBlock = SpawnQuadBlock();
             gameState->turbo = false;
