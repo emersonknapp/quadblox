@@ -254,13 +254,21 @@ void shutdownSDL( Platform* platform ) {
 
 void finalizeBlock( GameState* gameState, QuadBlock qb ) {
     gameState->blocks.push_back( qb );
-    memset( gameState->blockBake, 0, sizeof gameState->blockBake );
+    for ( int i = 0; i < PLAYAREA_WIDTH; i++ ) {
+        for ( int j = 0; j < PLAYAREA_HEIGHT; j++ ) {
+            gameState->blockBake[j][i] = false;
+        }
+    }
 
     for ( const QuadBlock& b : gameState->blocks ) {
         for ( int i = 0; i < 4; i++ ) {
             for ( int j = 0; j < 4; j++ ) {
                 int square = b.square( j, i );
-                gameState->blockBake[j + b.y][i + b.x] |= square; 
+                int row = j + b.y;
+                int col = i + b.x;
+                if ( row >= 0 && row < PLAYAREA_HEIGHT && col >= 0 && col < PLAYAREA_WIDTH ) {
+                    gameState->blockBake[j + b.y][i + b.x] |= square; 
+                }
             }
         }
     }
