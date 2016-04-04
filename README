@@ -1,7 +1,17 @@
+#Packages you need (homebrew names)
+sdl2 sdl2_image sdl2_ttf make cmake
+
+#first time setup
 mkdir build
-cd build
+pushd build
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug ../
+popd
+
+#build
+pushd build
 make
 make install
-cd ..
+popd
+
+#run
 ./bin/sdl01
