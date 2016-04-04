@@ -128,10 +128,10 @@ void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* ga
     SDL_RenderClear( renderer );
 
     // Game area
-    int gameAreaHeight = SCREEN_HEIGHT * 0.8;
+    int gameAreaHeight = int(SCREEN_HEIGHT * 0.8);
     gameAreaHeight = gameAreaHeight - ( gameAreaHeight % PLAYAREA_HEIGHT );
     int gameAreaWidth = gameAreaHeight / 2; 
-    SDL_Rect gameAreaViewport = Rect( 0.1 * SCREEN_HEIGHT, 0.1 * SCREEN_WIDTH, gameAreaWidth, gameAreaHeight );
+    SDL_Rect gameAreaViewport = Rect( int(0.1 * SCREEN_HEIGHT), int(0.1 * SCREEN_WIDTH), gameAreaWidth, gameAreaHeight );
     SDL_RenderSetViewport( renderer, &gameAreaViewport );
     SDL_SetRenderDrawColor( renderer, 0xCC, 0xCC, 0xCC, 0xFF );
     SDL_Rect gameAreaBackground = Rect( 0, 0, gameAreaWidth, gameAreaHeight );
@@ -189,20 +189,19 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
 
     GameState gameState;
 
-    std::chrono::duration<double>                               tSeconds( 0.0 );
-    std::chrono::duration<double>                               dtSeconds( 0.01 );
-    std::chrono::time_point<std::chrono::high_resolution_clock> lastTime = std::chrono::high_resolution_clock::now();
-    std::chrono::time_point<std::chrono::high_resolution_clock> newTime;
-    std::chrono::duration<double>                               accumulator( 0.0 );
-    std::chrono::duration<double>                               frameTime;
-
-    std::chrono::duration<double> runningFrameAverage( 0.0 );
+    static const uint64_t perfFreq = SDL_GetPerformanceFrequency();
+    double tSeconds = 0;
+    double dtSeconds = 0.01;
+    uint64 lastTime = SDL_GetPerformanceCounter();
+    uint64 newTime;
+    double accumulator = 0;
+    double frameTime;
     static const double fpsSmoothing = 0.9;
-    std::chrono::duration<double> currentFPS;
+    double currentFPS;
 
     while ( !gameState.wantsToQuit ) {
-        newTime = std::chrono::high_resolution_clock::now();
-        frameTime = newTime - lastTime;
+        newTime = SDL_GetPerformanceCounter();
+        frameTime = ( newTime - lastTime ) / double(perfFreq);
         lastTime = newTime;
 
         accumulator += frameTime;

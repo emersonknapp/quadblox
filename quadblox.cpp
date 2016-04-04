@@ -1,7 +1,8 @@
-#include <chrono>
 #include <vector>
-
 #include <stdint.h>
+
+typedef uint64_t uint64;
+
 const int SCREEN_WIDTH = 960;
 const int SCREEN_HEIGHT = 960;
 
@@ -108,8 +109,8 @@ QuadBlock SpawnQuadBlock() {
 
 
 typedef struct GameState {
-    std::chrono::duration<double> timeSinceLastFall = std::chrono::duration<double>( 0.0 );
-    std::chrono::duration<double> timePerFall = std::chrono::duration<double>( 1.0 );
+    double timeSinceLastFall = 0;
+    double timePerFall = 1.0;
     QuadBlock currentBlock = SpawnQuadBlock();
     std::vector<QuadBlock> blocks;
     bool blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] = { { 0 } };
@@ -168,7 +169,7 @@ void printBake( bool bake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] ) {
 
 
 
-void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
+void updateGame( GameState* gameState, double dt ) {
     if ( gameState->paused ) {
         return;
     }
@@ -199,7 +200,7 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
     if ( qb.x >= PLAYAREA_WIDTH - 4 + qb.right() ) qb.x = PLAYAREA_WIDTH - 4 + qb.right();
 
     // Vertical Motion
-    auto timePerFall = gameState->timePerFall;
+    double timePerFall = gameState->timePerFall;
     if ( gameState->turbo ) {
         timePerFall /= TURBOFACTOR;
     }
