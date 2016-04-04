@@ -23,23 +23,11 @@ set(BIN_DIR "${SOURCE_DIR}/bin")
 #### Application ####
 
 add_definitions("-D DEBUG")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wextra -pedantic --std=c++0x")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wconversion -Wextra -pedantic -std=c++0x -stdlib=libc++")
 
-FILE(GLOB Source_files
-	*.cpp
-)
+set(Source_files main.cpp)
 
-FILE(GLOB Header_files
-    *.h
-)
-
-FILE(GLOB Assets_files
-    assets/*.*
-)
-
-source_group("Assets" FILES ${Assets_files})
-
-add_executable(${PROJECT_NAME} ${Source_files} ${Assets_files})
+add_executable(${PROJECT_NAME} ${Source_files})
 
 target_link_libraries(${PROJECT_NAME} ${LINK_LIBS})
 
