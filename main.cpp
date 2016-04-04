@@ -274,10 +274,12 @@ void finalizeBlock( GameState* gameState, QuadBlock qb ) {
     }
 }
 
-bool blockHitsBake( const QuadBlock& qb, const bool blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH], const int verticalLookahead ) {
+bool blockHitsBake( const QuadBlock& qb, const bool blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH], const int verticalLookahead, const int horizLookahead ) {
     for ( int i = 0; i < 4; i++ ) {
         for ( int j = 0; j < 4; j++ ) {
-            if ( qb.square( j, i ) & blockBake[j + qb.y + verticalLookahead][i + qb.x] ) {
+            int row = j + qb.y + verticalLookahead;
+            int col = i + qb.x + horizLookahead;
+            if ( row >= 0 && row < PLAYAREA_HEIGHT && col >= 0 && col < PLAYAREA_WIDTH && ( qb.square( j, i ) & blockBake[row][col] ) ) {
                 return true;
             }
         }
@@ -305,8 +307,11 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
     QuadBlock& qb = gameState->currentBlock;
 
     // Horizontal motion
-    qb.x += gameState->horizMove;
+    if ( !blockHitsBake( qb, gameState->blockBake, 0, gameState->horizMove ) ) {
+        qb.x += gameState->horizMove;
+    }
     gameState->horizMove = 0;
+
 
     for ( int i = 0; i < gameState->rotate; i++ ) {
         qb.rotate();
@@ -332,7 +337,7 @@ void updateGame( GameState* gameState, std::chrono::duration<double> dt ) {
         gameState->timeSinceLastFall -= gameState->timeSinceLastFall;
 
         int newY = qb.y + 1;
-        if ( newY >= realBottom || blockHitsBake( qb, gameState->blockBake, 1 ) ) {
+        if ( newY >= realBottom || blockHitsBake( qb, gameState->blockBake, 1, 0 ) ) {
             finalizeBlock( gameState, gameState->currentBlock );
             gameState->currentBlock = SpawnQuadBlock();
             gameState->turbo = false;
