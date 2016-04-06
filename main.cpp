@@ -144,8 +144,15 @@ void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* ga
     int blockWidth = gameAreaWidth / PLAYAREA_WIDTH;
     int blockHeight = gameAreaHeight / PLAYAREA_HEIGHT;
     drawBlock( renderer, assets, gameState->currentBlock, blockWidth, blockHeight );
-    for ( const QuadBlock& qb : gameState->blocks ) {
-        drawBlock( renderer, assets, qb, blockWidth, blockHeight );
+    SDL_Rect blockRect;
+    for ( int i = 0; i < PLAYAREA_HEIGHT; i++ ) {
+        for ( int j = 0; j < PLAYAREA_WIDTH; j++ ) {
+            int blockType = gameState->blockBake[i][j];
+            if ( blockType > -1 ) {
+                blockRect = Rect(j*blockWidth, i*blockHeight, blockWidth, blockHeight );
+                SDL_RenderCopy( renderer, assets->blockTextures[blockType], NULL, &blockRect );
+            }
+        }
     }
 
     SDL_RenderPresent( renderer );
@@ -191,6 +198,11 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
     SDL_Event e;
 
     GameState gameState;
+    for ( int i = 0; i < PLAYAREA_HEIGHT; i++ ) {
+        for ( int j = 0; j < PLAYAREA_WIDTH; j++ ) {
+            gameState.blockBake[i][j] = -1;
+        }
+    }
 
     static const uint64_t perfFreq = SDL_GetPerformanceFrequency();
     double tSeconds = 0;

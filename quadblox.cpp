@@ -112,8 +112,7 @@ typedef struct GameState {
     double timeSinceLastFall = 0;
     double timePerFall = 1.0;
     QuadBlock currentBlock = SpawnQuadBlock();
-    std::vector<QuadBlock> blocks;
-    bool blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] = { { 0 } };
+    int blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] = { { -1 } };
     int horizMove = 0;
     int rotate = 0;
     bool wantsToQuit = false;
@@ -122,52 +121,38 @@ typedef struct GameState {
 } GameState;
 
 
-void finalizeBlock( GameState* gameState, QuadBlock qb ) {
-    gameState->blocks.push_back( qb );
-    for ( int i = 0; i < PLAYAREA_WIDTH; i++ ) {
-        for ( int j = 0; j < PLAYAREA_HEIGHT; j++ ) {
-            gameState->blockBake[j][i] = false;
+void printBake( int bake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] ) {
+    for ( int i = 0; i < PLAYAREA_HEIGHT; i++ ) {
+        for ( int j = 0; j < PLAYAREA_WIDTH; j++ ) {
+            printf( "%02d ", bake[i][j] );    
         }
+        printf("\n");
     }
-
-    for ( const QuadBlock& b : gameState->blocks ) {
-        for ( int i = 0; i < 4; i++ ) {
-            for ( int j = 0; j < 4; j++ ) {
-                int square = b.square( j, i );
-                int row = j + b.y;
-                int col = i + b.x;
-                if ( row >= 0 && row < PLAYAREA_HEIGHT && col >= 0 && col < PLAYAREA_WIDTH ) {
-                    gameState->blockBake[j + b.y][i + b.x] |= square; 
-                }
+    printf("\n\n");
+}
+void finalizeBlock( GameState* gameState, QuadBlock qb ) {
+    for ( int i = 0; i < 4; i++ ) {
+        for ( int j = 0; j < 4; j++ ) {
+            if ( qb.square( i, j ) ) {
+                gameState->blockBake[ i + qb.y ][ j + qb.x ] = qb.blockType;
             }
         }
     }
+    printBake(gameState->blockBake);
 }
 
-bool blockHitsBake( const QuadBlock& qb, const bool blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH], const int verticalLookahead, const int horizLookahead ) {
+bool blockHitsBake( const QuadBlock& qb, const int blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH], const int verticalLookahead, const int horizLookahead ) {
     for ( int i = 0; i < 4; i++ ) {
         for ( int j = 0; j < 4; j++ ) {
             int row = j + qb.y + verticalLookahead;
             int col = i + qb.x + horizLookahead;
-            if ( row >= 0 && row < PLAYAREA_HEIGHT && col >= 0 && col < PLAYAREA_WIDTH && ( qb.square( j, i ) & blockBake[row][col] ) ) {
+            if ( row >= 0 && row < PLAYAREA_HEIGHT && col >= 0 && col < PLAYAREA_WIDTH && qb.square( j, i ) && ( blockBake[row][col] > -1 ) ) {
                 return true;
             }
         }
     }
     return false;
 }
-
-void printBake( bool bake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] ) {
-    for ( int i = 0; i < PLAYAREA_HEIGHT; i++ ) {
-        for ( int j = 0; j < PLAYAREA_WIDTH; j++ ) {
-            printf( "%d ", bake[i][j] );    
-        }
-        printf("\n");
-    }
-    printf("\n\n");
-}
-
-
 
 void updateGame( GameState* gameState, double dt ) {
     if ( gameState->paused ) {
