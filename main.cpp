@@ -99,9 +99,13 @@ void initSDL( SDL_Renderer*& renderer, SDL_Window*& window ) {
 }
 
 void shutdownSDL( SDL_Renderer* renderer, SDL_Window* window ) {
-    SDL_DestroyRenderer( renderer );
+    if ( renderer ) {
+        SDL_DestroyRenderer( renderer );
+    }
     renderer = NULL;
-    SDL_DestroyWindow( window );
+    if ( window) {
+        SDL_DestroyWindow( window );
+    }
     window = NULL;
     IMG_Quit();
     SDL_Quit();
@@ -115,7 +119,6 @@ void drawBlock( SDL_Renderer* renderer, const Assets* assets, const QuadBlock& q
             if ( qb.square( i, j ) ) {
                 blockRect = Rect( ( qb.x + j ) * w, ( qb.y + i ) * h, w, h );
                 SDL_RenderCopy( renderer, assets->blockTextures[qb.blockType], NULL, &blockRect );
-                //SDL_RenderFillRect( renderer, &blockRect );
                 blocksDrawn++;
             }
         }
@@ -244,8 +247,9 @@ int main( int /*argc*/, char** /*argv*/ ) {
             mainLoop( renderer, assets );
         }
     }
-
-    freeMedia( assets );
+    if ( assets ) {
+        freeMedia( assets );
+    }
     shutdownSDL( renderer, window );
     return 0;
 }
