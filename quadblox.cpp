@@ -130,15 +130,14 @@ void printBake( int bake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] ) {
     }
     printf("\n\n");
 }
-void finalizeBlock( GameState* gameState, QuadBlock qb ) {
+void bakeBlock( int blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH], QuadBlock qb ) {
     for ( int i = 0; i < 4; i++ ) {
         for ( int j = 0; j < 4; j++ ) {
             if ( qb.square( i, j ) ) {
-                gameState->blockBake[ i + qb.y ][ j + qb.x ] = qb.blockType;
+                blockBake[ i + qb.y ][ j + qb.x ] = qb.blockType;
             }
         }
     }
-    printBake(gameState->blockBake);
 }
 
 bool blockHitsBake( const QuadBlock& qb, const int blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH], const int verticalLookahead, const int horizLookahead ) {
@@ -152,6 +151,20 @@ bool blockHitsBake( const QuadBlock& qb, const int blockBake[PLAYAREA_HEIGHT][PL
         }
     }
     return false;
+}
+
+void findCompleteRows( const int game[PLAYAREA_HEIGHT][PLAYAREA_WIDTH], int outRows[4], int& outNumRows ) {
+    outNumRows = 0;
+    for ( int row = 0; row < PLAYAREA_HEIGHT; row++ ) {
+        bool full = true;
+        for ( int col = 0; col < PLAYAREA_WIDTH; col++ ) {
+            full = full && ( game[row][col] != -1 );
+        }
+        if ( full && outNumRows < 4) {
+            outRows[outNumRows] = row;
+            outNumRows++;
+        }
+    }
 }
 
 void updateGame( GameState* gameState, double dt ) {
@@ -195,7 +208,10 @@ void updateGame( GameState* gameState, double dt ) {
 
         int newY = qb.y + 1;
         if ( newY >= realBottom || blockHitsBake( qb, gameState->blockBake, 1, 0 ) ) {
-            finalizeBlock( gameState, gameState->currentBlock );
+            bakeBlock( gameState->blockBake, gameState->currentBlock );
+            int completeRows[4] = { 0, 0, 0, 0 };
+            int completeNumRows = 0;
+            findCompleteRows( gameState->blockBake, completeRows, completeNumRows );
             gameState->currentBlock = SpawnQuadBlock();
             gameState->turbo = false;
         } else {
