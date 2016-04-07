@@ -11,7 +11,7 @@ const int PLAYAREA_HEIGHT = 20;
 const int NUM_BLOCKTYPES = 7;
 const int NUM_BLOCKSTATES = 4;
 
-const int TURBOFACTOR = 8;
+const int TURBOFACTOR = 16;
 
 // Draw each state of each block in a 4x4 grid, represent each grid as a 16-bit int. 1 is square, 0 is no square
 const uint16_t BLOCKS[NUM_BLOCKTYPES][NUM_BLOCKSTATES] = {
@@ -115,9 +115,17 @@ typedef struct GameState {
     int blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] = { { -1 } };
     int horizMove = 0;
     int rotate = 0;
+
     bool wantsToQuit = false;
     bool paused = false;
     bool turbo = false;
+    
+    //Completed rows animation logic
+    int numCompleteRows = 0;
+    int completeRows[4] = { 0, 0, 0, 0 };
+    bool flashOn = false;
+    double flashSpeed = 0.1;
+    double flashAccumulator = 0;
 } GameState;
 
 
@@ -172,8 +180,18 @@ void updateGame( GameState* gameState, double dt ) {
         return;
     }
 
+    //Update PlayArea state ( completed row flashing )
     gameState->timeSinceLastFall += dt;
+    if ( gameState->numCompleteRows > 0 ) {
+        gameState->flashAccumulator += dt;
+        while ( gameState->flashAccumulator > gameState->flashSpeed ) {
+            gameState->flashOn = !gameState->flashOn;
+            gameState->flashAccumulator -= gameState->flashSpeed;
+        }
+    }
 
+
+    //Update block state
     QuadBlock& qb = gameState->currentBlock;
 
     // Horizontal motion
@@ -182,7 +200,9 @@ void updateGame( GameState* gameState, double dt ) {
     }
     gameState->horizMove = 0;
 
-
+    //Rotation
+    //TODO(ebk): rotation can put us through other blocks. 
+    //Maybe accumulate all changes into one final state, and then reject or reconcile that state based on collision
     for ( int i = 0; i < gameState->rotate; i++ ) {
         qb.rotate();
     }
@@ -194,6 +214,7 @@ void updateGame( GameState* gameState, double dt ) {
         qb.y = realBottom - 1;
     }
 
+    //Snap into playarea
     if ( qb.x <= -qb.left() ) qb.x = -qb.left();
     if ( qb.x >= PLAYAREA_WIDTH - 4 + qb.right() ) qb.x = PLAYAREA_WIDTH - 4 + qb.right();
 
@@ -204,14 +225,22 @@ void updateGame( GameState* gameState, double dt ) {
     }
     if ( gameState->timeSinceLastFall > timePerFall ) {
         //TODO: this is not fully correct. BUT, we don't want accumulated time from a full-length fall to cause multiple blocks fallage in a row
-        gameState->timeSinceLastFall -= gameState->timeSinceLastFall;
+        gameState->timeSinceLastFall = 0;
 
         int newY = qb.y + 1;
         if ( newY >= realBottom || blockHitsBake( qb, gameState->blockBake, 1, 0 ) ) {
             bakeBlock( gameState->blockBake, gameState->currentBlock );
+            
             int completeRows[4] = { 0, 0, 0, 0 };
             int completeNumRows = 0;
             findCompleteRows( gameState->blockBake, completeRows, completeNumRows );
+
+            if ( completeNumRows > 0 ) {
+                gameState->numCompleteRows = completeNumRows;
+                for ( int i = 0; i < completeNumRows; i++ ) {
+                    gameState->completeRows[i] = completeRows[i];
+                }
+            }
             gameState->currentBlock = SpawnQuadBlock();
             gameState->turbo = false;
         } else {

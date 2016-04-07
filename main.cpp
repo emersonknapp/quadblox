@@ -145,12 +145,23 @@ void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* ga
     int blockHeight = gameAreaHeight / PLAYAREA_HEIGHT;
     drawBlock( renderer, assets, gameState->currentBlock, blockWidth, blockHeight );
     SDL_Rect blockRect;
-    for ( int i = 0; i < PLAYAREA_HEIGHT; i++ ) {
-        for ( int j = 0; j < PLAYAREA_WIDTH; j++ ) {
-            int blockType = gameState->blockBake[i][j];
+    for ( int row = 0; row < PLAYAREA_HEIGHT; row++ ) {
+        for ( int col = 0; col < PLAYAREA_WIDTH; col++ ) {
+            int blockType = gameState->blockBake[row][col];
             if ( blockType > -1 ) {
-                blockRect = Rect(j*blockWidth, i*blockHeight, blockWidth, blockHeight );
+                bool flash = false;
+                if ( gameState->flashOn && gameState->numCompleteRows > 0 ) {
+                    for ( int completeRowIdx = 0; completeRowIdx < gameState->numCompleteRows; completeRowIdx++ ) {
+                        flash |= gameState->completeRows[completeRowIdx] == row;
+                    }
+                }
+                
+                blockRect = Rect(col*blockWidth, row*blockHeight, blockWidth, blockHeight );
                 SDL_RenderCopy( renderer, assets->blockTextures[blockType], NULL, &blockRect );
+                if ( flash ) {
+                    SDL_SetRenderDrawColor( renderer, 0xFF, 0xFF, 0xFF, 0x88 );
+                    SDL_RenderFillRect( renderer, &blockRect );
+                }
             }
         }
     }
@@ -252,6 +263,7 @@ int main( int /*argc*/, char** /*argv*/ ) {
     if ( renderer == NULL || window == NULL ) {
         printf( "Failed to initialize\n" );
     } else {
+        SDL_SetRenderDrawBlendMode( renderer, SDL_BLENDMODE_BLEND );
         assets = loadMedia( renderer );
         if ( assets == NULL ) {
             printf( "Failed to load media\n" );
