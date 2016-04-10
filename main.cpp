@@ -116,7 +116,7 @@ void drawBlock( SDL_Renderer* renderer, const Assets* assets, const QuadBlock& q
     int blocksDrawn = 0;
     for ( int i = 0; i < 4; i++ ) {
         for ( int j = 0; j < 4; j++ ) {
-            if ( qb.square( i, j ) ) {
+            if ( Cell(qb, i, j ) ) {
                 blockRect = Rect( ( qb.x + j ) * w, ( qb.y + i ) * h, w, h );
                 SDL_RenderCopy( renderer, assets->blockTextures[qb.blockType], NULL, &blockRect );
                 blocksDrawn++;
@@ -143,7 +143,10 @@ void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* ga
     // Blocks
     int blockWidth = gameAreaWidth / PLAYAREA_WIDTH;
     int blockHeight = gameAreaHeight / PLAYAREA_HEIGHT;
-    drawBlock( renderer, assets, gameState->currentBlock, blockWidth, blockHeight );
+    if (gameState->animating <= 0) {
+        drawBlock( renderer, assets, *gameState->currentBlock, blockWidth, blockHeight );
+    }
+
     SDL_Rect blockRect;
     for ( int row = 0; row < PLAYAREA_HEIGHT; row++ ) {
         for ( int col = 0; col < PLAYAREA_WIDTH; col++ ) {
@@ -209,6 +212,8 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
     SDL_Event e;
 
     GameState gameState;
+    gameState.currentBlock = new QuadBlock();
+    *(gameState.currentBlock) = SpawnQuadBlock();
     for ( int i = 0; i < PLAYAREA_HEIGHT; i++ ) {
         for ( int j = 0; j < PLAYAREA_WIDTH; j++ ) {
             gameState.blockBake[i][j] = -1;

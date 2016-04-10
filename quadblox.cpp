@@ -1,13 +1,10 @@
-#include <vector>
-#include <stdint.h>
-
-typedef uint64_t uint64;
+#include <cstdlib>
+#include <cstdio>
+#include "quadblox.h"
 
 const int SCREEN_WIDTH = 960;
 const int SCREEN_HEIGHT = 960;
 
-const int PLAYAREA_WIDTH = 10;
-const int PLAYAREA_HEIGHT = 20;
 const int NUM_BLOCKTYPES = 7;
 const int NUM_BLOCKSTATES = 4;
 
@@ -30,103 +27,78 @@ const uint16_t BLOCKS_COL[NUM_BLOCKTYPES] = {
     0xE6EC, 0xE6EC, 0xE6EC, 0xECE6, 0x6666, 0xCE6E, 0x4F2F
 };
 
-struct QuadBlock {
-    void rotate() {
-        currentState = ( currentState + 1 ) % NUM_BLOCKSTATES;
-        state = BLOCKS[blockType][currentState];
-        cols = getCols();
-    }
+uint8 GetCols(int blockType, int stateIdx) {
+    return ( BLOCKS_COL[blockType] >> ( ( 4 - stateIdx - 1 ) * 4 ) ) & 0xF;
+}
 
-    int left() const {
-        int emptyLeft = 0;
-        for ( int i = 3; i >= 0; i-- ) {
-            if ( ( ( cols >> i ) & 1 ) == 0 ) emptyLeft++;
-            else break;
-        }
-        return emptyLeft;
-    }
+void RotateBlock(QuadBlock& qb, int numTimes) {
+    qb.currentState = ( qb.currentState + numTimes ) % NUM_BLOCKSTATES;
+    qb.state = BLOCKS[qb.blockType][qb.currentState];
+    qb.cols = GetCols(qb.blockType, qb.currentState);
+}
 
-    int right() const {
-        int emptyRight = 0;
-        for ( int i = 0; i < 4; i++ ) {
-            if ( ( ( cols >> i ) & 1 ) == 0 ) emptyRight++;
-            else break;
-        }
-        return emptyRight;
+int Left(const QuadBlock& qb) {
+    int emptyLeft = 0;
+    for ( int i = 3; i >= 0; i-- ) {
+        if ( ( ( qb.cols >> i ) & 1 ) == 0 ) emptyLeft++;
+        else break;
     }
+    return emptyLeft;
+}
 
-    int top() const {
-        int emptyTop = 0;
-        for ( int i = 12; i >= 0; i -= 4 ) {
-            if ( ( ( state >> i ) & 0xF ) == 0 ) emptyTop++;
-            else break;
-        }
-        return emptyTop;
+int Right(const QuadBlock& qb) {
+    int emptyRight = 0;
+    for ( int i = 0; i < 4; i++ ) {
+        if ( ( ( qb.cols >> i ) & 1 ) == 0 ) emptyRight++;
+        else break;
     }
+    return emptyRight;
+}
 
-    int bottom() const {
-        int emptyBottom = 0;
-        for ( int i = 0; i < 16; i += 4 ) {
-            if ( ( ( state >> i ) & 0xF ) == 0 ) emptyBottom++;
-            else break;
-        }
-        return emptyBottom;
+int Top(const QuadBlock& qb) {
+    int emptyTop = 0;
+    for ( int i = 12; i >= 0; i -= 4 ) {
+        if ( ( ( qb.state >> i ) & 0xF ) == 0 ) emptyTop++;
+        else break;
     }
+    return emptyTop;
+}
 
-    int row( int i ) const {
-       return 0xF & ( state >> ( 4 * ( 4 - i - 1 ) ) ); 
+int Bottom(const QuadBlock& qb) {
+    int emptyBottom = 0;
+    for ( int i = 0; i < 16; i += 4 ) {
+        if ( ( ( qb.state >> i ) & 0xF ) == 0 ) emptyBottom++;
+        else break;
     }
+    return emptyBottom;
+}
 
-    int square( int r, int c ) const {
-        int irow = row( r );
-        return 1 & ( irow >> ( 4 - c - 1 ) ); 
-    }
+int Row(const QuadBlock& qb, int i) {
+    return 0xF & ( qb.state >> ( 4 * ( 4 - i - 1 ) ) );  
+}
 
-    uint8_t getCols() const {
-        return ( BLOCKS_COL[blockType] >> ( ( 4 - currentState - 1 ) * 4 ) ) & 0xF;
-    }
+int Cell(const QuadBlock& qb, int r, int c) {
+    int irow = Row( qb, r );
+    return 1 & ( irow >> ( 4 - c - 1 ) ); 
+}
 
-    int x;
-    int y;
-    int blockType;
-    int currentState;
-    uint16_t state;
-    uint8_t cols;
-};
+uint8 Cols(const QuadBlock& qb) {
+    return ( BLOCKS_COL[qb.blockType] >> ( ( 4 - qb.currentState - 1 ) * 4 ) ) & 0xF;
+}
 
 QuadBlock SpawnQuadBlock() {
     QuadBlock qb;
     qb.currentState = rand() % NUM_BLOCKSTATES;
-    qb.blockType = rand() % NUM_BLOCKTYPES;
+    qb.blockType = 6;
+    //qb.blockType = rand() % NUM_BLOCKTYPES;
     qb.state = BLOCKS[qb.blockType][qb.currentState];
-    qb.cols = qb.getCols();
+    qb.cols = Cols(qb);
 
     //Fit to top, in case of empty-top
-    qb.y = -qb.top();
-    qb.x = ( rand() % ( PLAYAREA_WIDTH + qb.left() + qb.right() ) ) - qb.left();
+    qb.y = -Top(qb);
+    qb.x = ( rand() % ( PLAYAREA_WIDTH + Left(qb) + Right(qb) ) ) - Left(qb);
     return qb;
 }
-
-
-typedef struct GameState {
-    double timeSinceLastFall = 0;
-    double timePerFall = 1.0;
-    QuadBlock currentBlock = SpawnQuadBlock();
-    int blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] = { { -1 } };
-    int horizMove = 0;
-    int rotate = 0;
-
-    bool wantsToQuit = false;
-    bool paused = false;
-    bool turbo = false;
-    
-    //Completed rows animation logic
-    int numCompleteRows = 0;
-    int completeRows[4] = { 0, 0, 0, 0 };
-    bool flashOn = false;
-    double flashSpeed = 0.1;
-    double flashAccumulator = 0;
-} GameState;
 
 
 void printBake( int bake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] ) {
@@ -138,11 +110,11 @@ void printBake( int bake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH] ) {
     }
     printf("\n\n");
 }
-void bakeBlock( int blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH], QuadBlock qb ) {
+void bakeBlock( int blockBake[PLAYAREA_HEIGHT][PLAYAREA_WIDTH], const QuadBlock* qb ) {
     for ( int i = 0; i < 4; i++ ) {
         for ( int j = 0; j < 4; j++ ) {
-            if ( qb.square( i, j ) ) {
-                blockBake[ i + qb.y ][ j + qb.x ] = qb.blockType;
+            if ( Cell(*qb, i, j ) ) {
+                blockBake[ i + qb->y ][ j + qb->x ] = qb->blockType;
             }
         }
     }
@@ -153,7 +125,7 @@ bool blockHitsBake( const QuadBlock& qb, const int blockBake[PLAYAREA_HEIGHT][PL
         for ( int j = 0; j < 4; j++ ) {
             int row = j + qb.y + verticalLookahead;
             int col = i + qb.x + horizLookahead;
-            if ( row >= 0 && row < PLAYAREA_HEIGHT && col >= 0 && col < PLAYAREA_WIDTH && qb.square( j, i ) && ( blockBake[row][col] > -1 ) ) {
+            if ( row >= 0 && row < PLAYAREA_HEIGHT && col >= 0 && col < PLAYAREA_WIDTH && Cell(qb, j, i ) && ( blockBake[row][col] > -1 ) ) {
                 return true;
             }
         }
@@ -182,17 +154,28 @@ void updateGame( GameState* gameState, double dt ) {
 
     //Update PlayArea state ( completed row flashing )
     gameState->timeSinceLastFall += dt;
-    if ( gameState->numCompleteRows > 0 ) {
+    if ( gameState->animating > 0 ) {
         gameState->flashAccumulator += dt;
+        gameState->animating -= dt;
         while ( gameState->flashAccumulator > gameState->flashSpeed ) {
             gameState->flashOn = !gameState->flashOn;
             gameState->flashAccumulator -= gameState->flashSpeed;
         }
+        if ( gameState-> animating <= 0 ) {
+            gameState->animating = 0;
+            gameState->flashOn = false;
+            gameState->flashAccumulator = 0;
+        } else {
+            return;
+        }
     }
 
+    if ( gameState->numCompleteRows > 0 ) {
+        //ClearCompletedRows(gameState);
+    }
 
     //Update block state
-    QuadBlock& qb = gameState->currentBlock;
+    QuadBlock& qb = *gameState->currentBlock;
 
     // Horizontal motion
     if ( !blockHitsBake( qb, gameState->blockBake, 0, gameState->horizMove ) ) {
@@ -203,20 +186,18 @@ void updateGame( GameState* gameState, double dt ) {
     //Rotation
     //TODO(ebk): rotation can put us through other blocks. 
     //Maybe accumulate all changes into one final state, and then reject or reconcile that state based on collision
-    for ( int i = 0; i < gameState->rotate; i++ ) {
-        qb.rotate();
-    }
+    RotateBlock(qb, gameState->rotate);
     gameState->rotate = 0;
 
-    int realBottom = PLAYAREA_HEIGHT - 4 + qb.bottom() + 1;
+    int realBottom = PLAYAREA_HEIGHT - 4 + Bottom(qb) + 1;
     // Rotation can put our asses through the floor
     if ( qb.y >= realBottom - 1 ) {
         qb.y = realBottom - 1;
     }
 
     //Snap into playarea
-    if ( qb.x <= -qb.left() ) qb.x = -qb.left();
-    if ( qb.x >= PLAYAREA_WIDTH - 4 + qb.right() ) qb.x = PLAYAREA_WIDTH - 4 + qb.right();
+    if ( qb.x <= -Left(qb) ) qb.x = -Left(qb);
+    if ( qb.x >= PLAYAREA_WIDTH - 4 + Right(qb)) qb.x = PLAYAREA_WIDTH - 4 + Right(qb);
 
     // Vertical Motion
     double timePerFall = gameState->timePerFall;
@@ -240,8 +221,9 @@ void updateGame( GameState* gameState, double dt ) {
                 for ( int i = 0; i < completeNumRows; i++ ) {
                     gameState->completeRows[i] = completeRows[i];
                 }
+                gameState->animating = gameState->flashTime;
             }
-            gameState->currentBlock = SpawnQuadBlock();
+            *(gameState->currentBlock) = SpawnQuadBlock();
             gameState->turbo = false;
         } else {
             qb.y = newY;

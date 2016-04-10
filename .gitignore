@@ -1,3 +1,5 @@
 *.swp
 build/
 bin/
+xcproj/sdl01.xcodeproj/xcuserdata/emerson.xcuserdatad/xcdebugger/
+xcproj/sdl01.xcodeproj/project.xcworkspace/xcuserdata/
