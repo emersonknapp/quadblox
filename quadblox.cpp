@@ -147,6 +147,25 @@ void findCompleteRows( const int game[PLAYAREA_HEIGHT][PLAYAREA_WIDTH], int outR
     }
 }
 
+void ClearRow(GameBlocks blocks, int row) {
+    for ( int i = 0; i < PLAYAREA_WIDTH; i++ ) {
+        blocks[row][i] = -1;
+    }
+}
+
+void CopyRow(GameBlocks blocks, int from, int to) {
+    for ( int i = 0; i < PLAYAREA_WIDTH; i++ ) {
+        blocks[to][i] = blocks[from][i];
+    }
+}
+
+void ClearCompletedRows(GameState* gameState) {
+    for ( int rowClearedIdx = 0; rowClearedIdx < gameState->numCompleteRows; rowClearedIdx++ ) {
+        int completedRow = gameState->completeRows[rowClearedIdx];
+        ClearRow(gameState->blockBake, completedRow); 
+    }
+}
+
 void updateGame( GameState* gameState, double dt ) {
     if ( gameState->paused ) {
         return;
@@ -171,7 +190,8 @@ void updateGame( GameState* gameState, double dt ) {
     }
 
     if ( gameState->numCompleteRows > 0 ) {
-        //ClearCompletedRows(gameState);
+        ClearCompletedRows(gameState);
+        gameState->numCompleteRows = 0;
     }
 
     //Update block state

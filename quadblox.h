@@ -16,6 +16,7 @@ struct QuadBlock {
     uint8 cols;
 };
 
+typedef int GameBlocks[PLAYAREA_HEIGHT][PLAYAREA_WIDTH];
 
 typedef struct GameState {
     double timeSinceLastFall = 0;
