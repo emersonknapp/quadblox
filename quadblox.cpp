@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <cstdio>
+#include "stdlib.h"
 #include "quadblox.h"
 
 const int SCREEN_WIDTH = 960;
@@ -89,8 +90,7 @@ uint8 Cols(const QuadBlock& qb) {
 QuadBlock SpawnQuadBlock() {
     QuadBlock qb;
     qb.currentState = rand() % NUM_BLOCKSTATES;
-    qb.blockType = 6;
-    //qb.blockType = rand() % NUM_BLOCKTYPES;
+    qb.blockType = rand() % NUM_BLOCKTYPES;
     qb.state = BLOCKS[qb.blockType][qb.currentState];
     qb.cols = Cols(qb);
 
@@ -159,10 +159,21 @@ void CopyRow(GameBlocks blocks, int from, int to) {
     }
 }
 
+int compare_ints(const void* a, const void* b) {
+    const int* ia = (const int *)a;
+    const int* ib = (const int *)b;
+    return *ia - *ib;
+}
+
 void ClearCompletedRows(GameState* gameState) {
+    qsort(gameState->completeRows, (size_t)gameState->numCompleteRows, sizeof(int), compare_ints);
+
     for ( int rowClearedIdx = 0; rowClearedIdx < gameState->numCompleteRows; rowClearedIdx++ ) {
         int completedRow = gameState->completeRows[rowClearedIdx];
-        ClearRow(gameState->blockBake, completedRow); 
+        for ( int i = completedRow - 1; i >= 0; i--) {
+            CopyRow(gameState->blockBake, i, i+1);
+            ClearRow(gameState->blockBake, i);
+        }
     }
 }
 
