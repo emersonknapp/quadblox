@@ -2,26 +2,10 @@
 #include "SDL_image.h"
 #include "SDL_ttf.h"
 
-#include "quadblox.cpp"
+#include "quadblox.h"
 
 void PrintSDLError( const char* message ) {
     printf("%s Error: %s\n", message, SDL_GetError());
-}
-
-typedef struct Assets {
-    static const int numBlockTextures = 7;
-    SDL_Texture* blockTextures[ numBlockTextures ];
-    SDL_Texture* backgroundTexture = NULL;
-    TTF_Font* font = NULL;
-} Assets;
-
-SDL_Rect Rect( int x, int y, int w, int h ) {
-    SDL_Rect rect;
-    rect.x = x;
-    rect.y = y;
-    rect.w = w;
-    rect.h = h;
-    return rect;
 }
 
 SDL_Texture* loadTexture( const char* path, SDL_Renderer* renderer ) {
@@ -56,19 +40,6 @@ Assets* loadMedia( SDL_Renderer* renderer ) {
     if ( assets->backgroundTexture == NULL ) {
         printf( "Failed to load texture assets/BG.png\n");
         success = false;
-    }
-
-    assets->font = TTF_OpenFont( "assets/OpenSans.ttf", 16 );
-    if ( assets->font == NULL ) {
-        printf( "Failed to open font: %s\n", TTF_GetError() );
-        success = false;
-    } else {
-        SDL_Surface* tsurf = NULL;
-        SDL_Color col = {0, 0, 0, 0xFF};
-        if (!(tsurf = TTF_RenderText_Solid(assets->font, "HELO WORL", col))) {
-            printf("Failed to render text: %s\n", TTF_GetError());
-            success = false;
-        }
     }
 
     if ( !success ) {
@@ -135,61 +106,6 @@ void shutdownSDL( SDL_Renderer* renderer, SDL_Window* window ) {
     SDL_Quit();
 }
 
-void drawBlock( SDL_Renderer* renderer, const Assets* assets, const QuadBlock& qb, int w, int h ) {
-    SDL_Rect blockRect;
-    int blocksDrawn = 0;
-    for ( int i = 0; i < 4; i++ ) {
-        for ( int j = 0; j < 4; j++ ) {
-            if ( Cell(qb, i, j ) ) {
-                blockRect = Rect( ( qb.x + j ) * w, ( qb.y + i ) * h, w, h );
-                SDL_RenderCopy( renderer, assets->blockTextures[qb.blockType], NULL, &blockRect );
-                blocksDrawn++;
-            }
-        }
-    }
-}
-
-void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* gameState ) {
-    // Game area
-    int gameAreaHeight = int(SCREEN_HEIGHT * 0.8);
-    gameAreaHeight = gameAreaHeight - ( gameAreaHeight % PLAYAREA_HEIGHT );
-    int gameAreaWidth = gameAreaHeight / 2; 
-    SDL_Rect gameAreaViewport = Rect( int(0.1 * SCREEN_HEIGHT), int(0.1 * SCREEN_WIDTH), gameAreaWidth, gameAreaHeight );
-    SDL_RenderSetViewport( renderer, &gameAreaViewport );
-    SDL_SetRenderDrawColor( renderer, 0xCC, 0xCC, 0xCC, 0xFF );
-    SDL_Rect gameAreaBackground = Rect( 0, 0, gameAreaWidth, gameAreaHeight );
-    SDL_RenderCopy( renderer, assets->backgroundTexture, NULL, &gameAreaBackground );
-
-    // Blocks
-    int blockWidth = gameAreaWidth / PLAYAREA_WIDTH;
-    int blockHeight = gameAreaHeight / PLAYAREA_HEIGHT;
-    if (gameState->animating <= 0) {
-        drawBlock( renderer, assets, *gameState->currentBlock, blockWidth, blockHeight );
-    }
-
-    SDL_Rect blockRect;
-    for ( int row = 0; row < PLAYAREA_HEIGHT; row++ ) {
-        for ( int col = 0; col < PLAYAREA_WIDTH; col++ ) {
-            int blockType = gameState->blockBake[row][col];
-            if ( blockType > -1 ) {
-                bool flash = false;
-                if ( gameState->flashOn && gameState->numCompleteRows > 0 ) {
-                    for ( int completeRowIdx = 0; completeRowIdx < gameState->numCompleteRows; completeRowIdx++ ) {
-                        flash |= gameState->completeRows[completeRowIdx] == row;
-                    }
-                }
-                
-                blockRect = Rect(col*blockWidth, row*blockHeight, blockWidth, blockHeight );
-                SDL_RenderCopy( renderer, assets->blockTextures[blockType], NULL, &blockRect );
-                if ( flash ) {
-                    SDL_SetRenderDrawColor( renderer, 0xFF, 0xFF, 0xFF, 0x88 );
-                    SDL_RenderFillRect( renderer, &blockRect );
-                }
-            }
-        }
-    }
-
-}
 
 void gameKeydownHandler( GameState* gameState, SDL_KeyboardEvent key ) {
     switch ( key.keysym.sym ) {
@@ -231,8 +147,6 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
     SDL_Event e;
 
     GameState gameState;
-    gameState.currentBlock = new QuadBlock();
-    *(gameState.currentBlock) = SpawnQuadBlock();
     for ( int i = 0; i < PLAYAREA_HEIGHT; i++ ) {
         for ( int j = 0; j < PLAYAREA_WIDTH; j++ ) {
             gameState.blockBake[i][j] = -1;
@@ -241,22 +155,25 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
 
     static const uint64_t perfFreq = SDL_GetPerformanceFrequency();
     static const double targetTicsPerFrame = perfFreq / 60.0;
-    double tSeconds = 0;
-    static const double dtSeconds = 0.01;
+    static const double fpsSmoothing = 0.95;
     uint64 lastTime = SDL_GetPerformanceCounter();
     uint64 newTime;
-    double accumulator = 0;
     double frameTime;
-    static const double fpsSmoothing = 0.95;
     double currentFPS = 0;
     char fpsStr[4] = "000";
+    TTF_Font* font = NULL;
+
+    font = TTF_OpenFont( "assets/OpenSans.ttf", 16 );
+    if ( font == NULL ) {
+        printf( "Failed to open font: %s\n", TTF_GetError() );
+    } 
+
     SDL_Color textColor = { 0, 0, 0, 0xFF };
     SDL_Surface* textSurface = NULL;
     SDL_Texture* textTexture = NULL;
     SDL_Rect debugRect;
 
     while ( !gameState.wantsToQuit ) {
-        
         newTime = SDL_GetPerformanceCounter();
         frameTime = newTime - lastTime;
         if ( frameTime < targetTicsPerFrame ) {
@@ -264,8 +181,6 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
         }
         frameTime /= double(perfFreq);
         lastTime = newTime;
-
-        accumulator += frameTime;
 
         currentFPS = ( currentFPS * fpsSmoothing ) + ( ( 1.0 / frameTime ) * ( 1.0 - fpsSmoothing ) );
         snprintf(fpsStr, 4, "%d", int(currentFPS) );
@@ -281,25 +196,21 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
             }
         }
 
-        while ( accumulator >= dtSeconds ) {
-            updateGame( &gameState, dtSeconds );
-            accumulator -= dtSeconds;
-            tSeconds += dtSeconds;
-        }
-
-        // drawing
+        // clear screen to debug color and draw any debug rendering, like FPS
         SDL_SetRenderDrawColor( renderer, 0x99, 0xA0, 0x99, 0xFF );
         SDL_RenderClear( renderer );
 
-        textSurface = TTF_RenderText_Blended(assets->font, fpsStr, textColor);
-        textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
-        debugRect = Rect(0, 0, textSurface->w, textSurface->h);
-        SDL_RenderCopy(renderer, textTexture, NULL, &debugRect);
-        SDL_FreeSurface(textSurface);
-        SDL_DestroyTexture(textTexture);
+        if ( font != NULL ) {
+            textSurface = TTF_RenderText_Blended(font, fpsStr, textColor);
+            textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+            debugRect = Rect(0, 0, textSurface->w, textSurface->h);
+            SDL_RenderCopy(renderer, textTexture, NULL, &debugRect);
+            SDL_FreeSurface(textSurface);
+            SDL_DestroyTexture(textTexture);
+        }
 
-        drawGame( renderer, assets, &gameState );
-        
+        GameUpdateAndRender( renderer, assets, &gameState, frameTime );
+
         SDL_RenderSetViewport(renderer, NULL);
         SDL_RenderPresent( renderer );
     }

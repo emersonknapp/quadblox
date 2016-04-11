@@ -25,7 +25,7 @@ set(BIN_DIR "${SOURCE_DIR}/bin")
 add_definitions("-D DEBUG")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -Wconversion -Wextra -pedantic -std=c++0x -stdlib=libc++")
 
-set(Source_files main.cpp)
+file(GLOB Source_files *.cpp)
 
 add_executable(${PROJECT_NAME} ${Source_files})
 
