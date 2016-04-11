@@ -34,10 +34,37 @@ struct QuadBlock {
     uint8 cols;
 };
 
+namespace AssetType {
+    enum Enum : size_t {
+        BLOCK0,
+        BLOCK1,
+        BLOCK2,
+        BLOCK3,
+        BLOCK4,
+        BLOCK5,
+        BLOCK6,
+        BACKGROUND,
+        COUNT
+    };
+}
+
+inline size_t AssetTypeForBlockType(int blockType) {
+    return size_t(blockType);
+}
+
+static const char* AssetTextureFiles[AssetType::COUNT]= {
+    "Block1.png",
+    "Block2.png",
+    "Block3.png",
+    "Block4.png",
+    "Block5.png",
+    "Block6.png",
+    "Block7.png",
+    "BG.png"
+};
+
 typedef struct Assets {
-    static const int numBlockTextures = 7;
-    SDL_Texture* blockTextures[ numBlockTextures ];
-    SDL_Texture* backgroundTexture = NULL;
+    SDL_Texture* textures[AssetType::COUNT];
 } Assets;
 
 typedef int GameBlocks[PLAYAREA_HEIGHT][PLAYAREA_WIDTH];

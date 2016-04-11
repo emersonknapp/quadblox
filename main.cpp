@@ -26,20 +26,15 @@ SDL_Texture* loadTexture( const char* path, SDL_Renderer* renderer ) {
 Assets* loadMedia( SDL_Renderer* renderer ) {
     bool success = true;
     Assets* assets = new Assets();
-    char path[18] = "assets/Block0.png";
-    for ( int i = 0; i < NUM_BLOCKTYPES; i++ ) {
-        sprintf( path, "assets/Block%01d.png", i + 1 );
-        assets->blockTextures[i] = loadTexture( path, renderer );
-        if ( assets->blockTextures[i] == NULL ) {
+    char path[256] = "assets/Block0.png";
+    for ( size_t i = 0; i < AssetType::COUNT; i++ ) {
+        sprintf( path, "assets/%s", AssetTextureFiles[i] );
+        assets->textures[i] = loadTexture( path, renderer );
+        if ( assets->textures[i] == NULL ) {
             printf( "Failed to load texture %s\n", path );
             success = false;
             break;
         }
-    }
-    assets->backgroundTexture = loadTexture( "assets/BG.png", renderer );
-    if ( assets->backgroundTexture == NULL ) {
-        printf( "Failed to load texture assets/BG.png\n");
-        success = false;
     }
 
     if ( !success ) {
@@ -50,12 +45,10 @@ Assets* loadMedia( SDL_Renderer* renderer ) {
 }
 
 void freeMedia( Assets* assets ) {
-    for ( int i = 0; i < assets->numBlockTextures; i++ ) {
-        SDL_DestroyTexture( assets->blockTextures[i] );
-        assets->blockTextures[i] = NULL;
+    for ( size_t i = 0; i < AssetType::COUNT; i++ ) {
+        SDL_DestroyTexture( assets->textures[i] );
+        assets->textures[i] = NULL;
     }
-    SDL_DestroyTexture( assets->backgroundTexture );
-    assets->backgroundTexture = NULL;
 }
 
 void initSDL( SDL_Renderer*& renderer, SDL_Window*& window ) {

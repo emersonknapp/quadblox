@@ -177,7 +177,7 @@ void drawBlock( SDL_Renderer* renderer, const Assets* assets, const QuadBlock& q
         for ( int j = 0; j < 4; j++ ) {
             if ( Cell(qb, i, j ) ) {
                 blockRect = Rect( ( qb.x + j ) * w, ( qb.y + i ) * h, w, h );
-                SDL_RenderCopy( renderer, assets->blockTextures[qb.blockType], NULL, &blockRect );
+                SDL_RenderCopy( renderer, assets->textures[AssetTypeForBlockType(qb.blockType)], NULL, &blockRect );
                 blocksDrawn++;
             }
         }
@@ -193,7 +193,7 @@ void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* ga
     SDL_RenderSetViewport( renderer, &gameAreaViewport );
     SDL_SetRenderDrawColor( renderer, 0xCC, 0xCC, 0xCC, 0xFF );
     SDL_Rect gameAreaBackground = Rect( 0, 0, gameAreaWidth, gameAreaHeight );
-    SDL_RenderCopy( renderer, assets->backgroundTexture, NULL, &gameAreaBackground );
+    SDL_RenderCopy( renderer, assets->textures[AssetType::BACKGROUND], NULL, &gameAreaBackground );
 
     // Blocks
     int blockWidth = gameAreaWidth / PLAYAREA_WIDTH;
@@ -215,7 +215,7 @@ void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* ga
                 }
                 
                 blockRect = Rect(col*blockWidth, row*blockHeight, blockWidth, blockHeight );
-                SDL_RenderCopy( renderer, assets->blockTextures[blockType], NULL, &blockRect );
+                SDL_RenderCopy( renderer, assets->textures[AssetTypeForBlockType(blockType)], NULL, &blockRect );
                 if ( flash ) {
                     SDL_SetRenderDrawColor( renderer, 0xFF, 0xFF, 0xFF, 0x88 );
                     SDL_RenderFillRect( renderer, &blockRect );
