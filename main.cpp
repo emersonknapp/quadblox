@@ -12,6 +12,7 @@ typedef struct Assets {
     static const int numBlockTextures = 7;
     SDL_Texture* blockTextures[ numBlockTextures ];
     SDL_Texture* backgroundTexture = NULL;
+    TTF_Font* font = NULL;
 } Assets;
 
 SDL_Rect Rect( int x, int y, int w, int h ) {
@@ -57,6 +58,19 @@ Assets* loadMedia( SDL_Renderer* renderer ) {
         success = false;
     }
 
+    assets->font = TTF_OpenFont( "assets/OpenSans.ttf", 16 );
+    if ( assets->font == NULL ) {
+        printf( "Failed to open font: %s\n", TTF_GetError() );
+        success = false;
+    } else {
+        SDL_Surface* tsurf = NULL;
+        SDL_Color col = {0, 0, 0, 0xFF};
+        if (!(tsurf = TTF_RenderText_Solid(assets->font, "HELO WORL", col))) {
+            printf("Failed to render text: %s\n", TTF_GetError());
+            success = false;
+        }
+    }
+
     if ( !success ) {
         delete assets;
         assets = NULL;
@@ -76,26 +90,36 @@ void freeMedia( Assets* assets ) {
 void initSDL( SDL_Renderer*& renderer, SDL_Window*& window ) {
     if ( SDL_Init( SDL_INIT_VIDEO ) != 0 ) {
         PrintSDLError("SDL_Init");
-    } else {
-        if ( !SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, "1" ) ) {
-            printf( "Warning: Linear texture filtering not enabled!" );
-        }
+        return;
+    } 
 
-        window = SDL_CreateWindow("QuadBlocks!", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
-        if ( window == NULL ) {
-            PrintSDLError("SDL_CreateWindow");
-        } else {
-            renderer = SDL_CreateRenderer( window, -1, SDL_RENDERER_ACCELERATED );
-            if ( renderer == NULL ) {
-                PrintSDLError( "SDL_CreateRenderer" );
-            } else {
-                int imgFlags = IMG_INIT_PNG;
-                if ( !( IMG_Init( imgFlags ) & imgFlags ) ) {
-                    printf( "SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError() );
-                }
-            }
-        }
-    }    
+    if ( !SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, "1" ) ) {
+        printf( "Warning: Linear texture filtering not enabled!" );
+    }
+    window = SDL_CreateWindow("QuadBlocks!", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+    if ( window == NULL ) {
+        PrintSDLError("SDL_CreateWindow");
+        return;
+    } 
+
+    renderer = SDL_CreateRenderer( window, -1, SDL_RENDERER_ACCELERATED );
+    if ( renderer == NULL ) {
+        PrintSDLError( "SDL_CreateRenderer" );
+        return;
+    } 
+
+
+    int imgFlags = IMG_INIT_PNG;
+    if ( !( IMG_Init( imgFlags ) & imgFlags ) ) {
+        printf( "SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError() );
+        return;
+    }
+
+    if ( TTF_Init() == -1 ) {
+        printf("SDL_ttf failed to initialize: %s\n", TTF_GetError());
+        return;
+    }
+
 }
 
 void shutdownSDL( SDL_Renderer* renderer, SDL_Window* window ) {
@@ -126,10 +150,6 @@ void drawBlock( SDL_Renderer* renderer, const Assets* assets, const QuadBlock& q
 }
 
 void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* gameState ) {
-    // background
-    SDL_SetRenderDrawColor( renderer, 0x99, 0xA0, 0x99, 0xFF );
-    SDL_RenderClear( renderer );
-
     // Game area
     int gameAreaHeight = int(SCREEN_HEIGHT * 0.8);
     gameAreaHeight = gameAreaHeight - ( gameAreaHeight % PLAYAREA_HEIGHT );
@@ -169,7 +189,6 @@ void drawGame( SDL_Renderer* renderer, const Assets* assets, const GameState* ga
         }
     }
 
-    SDL_RenderPresent( renderer );
 }
 
 void gameKeydownHandler( GameState* gameState, SDL_KeyboardEvent key ) {
@@ -221,23 +240,35 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
     }
 
     static const uint64_t perfFreq = SDL_GetPerformanceFrequency();
+    static const double targetTicsPerFrame = perfFreq / 60.0;
     double tSeconds = 0;
-    double dtSeconds = 0.01;
+    static const double dtSeconds = 0.01;
     uint64 lastTime = SDL_GetPerformanceCounter();
     uint64 newTime;
     double accumulator = 0;
     double frameTime;
-    static const double fpsSmoothing = 0.9;
-    double currentFPS;
+    static const double fpsSmoothing = 0.95;
+    double currentFPS = 0;
+    char fpsStr[4] = "000";
+    SDL_Color textColor = { 0, 0, 0, 0xFF };
+    SDL_Surface* textSurface = NULL;
+    SDL_Texture* textTexture = NULL;
+    SDL_Rect debugRect;
 
     while ( !gameState.wantsToQuit ) {
+        
         newTime = SDL_GetPerformanceCounter();
-        frameTime = ( newTime - lastTime ) / double(perfFreq);
+        frameTime = newTime - lastTime;
+        if ( frameTime < targetTicsPerFrame ) {
+            continue;
+        }
+        frameTime /= double(perfFreq);
         lastTime = newTime;
 
         accumulator += frameTime;
 
-        currentFPS = ( currentFPS * fpsSmoothing ) + ( frameTime * ( 1.0 - fpsSmoothing ) );
+        currentFPS = ( currentFPS * fpsSmoothing ) + ( ( 1.0 / frameTime ) * ( 1.0 - fpsSmoothing ) );
+        snprintf(fpsStr, 4, "%d", int(currentFPS) );
 
         // Input handling
         while ( SDL_PollEvent( &e ) != 0 ) {
@@ -255,7 +286,22 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
             accumulator -= dtSeconds;
             tSeconds += dtSeconds;
         }
+
+        // drawing
+        SDL_SetRenderDrawColor( renderer, 0x99, 0xA0, 0x99, 0xFF );
+        SDL_RenderClear( renderer );
+
+        textSurface = TTF_RenderText_Blended(assets->font, fpsStr, textColor);
+        textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+        debugRect = Rect(0, 0, textSurface->w, textSurface->h);
+        SDL_RenderCopy(renderer, textTexture, NULL, &debugRect);
+        SDL_FreeSurface(textSurface);
+        SDL_DestroyTexture(textTexture);
+
         drawGame( renderer, assets, &gameState );
+        
+        SDL_RenderSetViewport(renderer, NULL);
+        SDL_RenderPresent( renderer );
     }
 }
 
