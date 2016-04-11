@@ -26,14 +26,39 @@ SDL_Texture* loadTexture( const char* path, SDL_Renderer* renderer ) {
 Assets* loadMedia( SDL_Renderer* renderer ) {
     bool success = true;
     Assets* assets = new Assets();
-    char path[256] = "assets/Block0.png";
-    for ( size_t i = 0; i < AssetType::COUNT; i++ ) {
-        sprintf( path, "assets/%s", AssetTextureFiles[i] );
-        assets->textures[i] = loadTexture( path, renderer );
-        if ( assets->textures[i] == NULL ) {
-            printf( "Failed to load texture %s\n", path );
-            success = false;
-            break;
+    
+
+    assets->font = TTF_OpenFont( "assets/OpenSans.ttf", 16 );
+    if ( assets->font == NULL ) {
+        printf( "Failed to open font: %s\n", TTF_GetError() );
+        success = false;
+    } 
+
+    if ( success ) {
+        char path[256] = "assets/Block0.png";
+        for ( size_t i = 0; i < AssetType::COUNT; i++ ) {
+            const char* filename = AssetTextureFiles[i];
+            if ( filename == NULL ) {
+                printf("Undefined texture filename for type %zu\n", i);
+                success = false;
+                break;
+            }
+
+            if ( strncmp(filename, "TEXT_", 5) == 0 ) {
+                SDL_Color textColor = { 0xFF, 0xFF, 0xFF, 0xFF };
+                SDL_Surface* textSurface = TTF_RenderText_Blended(assets->font, filename+5, textColor);
+                assets->textures[i] = SDL_CreateTextureFromSurface(renderer, textSurface);
+                SDL_FreeSurface(textSurface);
+                continue; 
+            }
+
+            sprintf( path, "assets/%s", filename );
+            assets->textures[i] = loadTexture( path, renderer );
+            if ( assets->textures[i] == NULL ) {
+                printf( "Failed to load texture %s\n", path );
+                success = false;
+                break;
+            }
         }
     }
 
@@ -154,12 +179,6 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
     double frameTime;
     double currentFPS = 0;
     char fpsStr[4] = "000";
-    TTF_Font* font = NULL;
-
-    font = TTF_OpenFont( "assets/OpenSans.ttf", 16 );
-    if ( font == NULL ) {
-        printf( "Failed to open font: %s\n", TTF_GetError() );
-    } 
 
     SDL_Color textColor = { 0, 0, 0, 0xFF };
     SDL_Surface* textSurface = NULL;
@@ -193,8 +212,8 @@ void mainLoop( SDL_Renderer* renderer, Assets* assets ) {
         SDL_SetRenderDrawColor( renderer, 0x99, 0xA0, 0x99, 0xFF );
         SDL_RenderClear( renderer );
 
-        if ( font != NULL ) {
-            textSurface = TTF_RenderText_Blended(font, fpsStr, textColor);
+        {
+            textSurface = TTF_RenderText_Blended(assets->font, fpsStr, textColor);
             textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
             debugRect = Rect(0, 0, textSurface->w, textSurface->h);
             SDL_RenderCopy(renderer, textTexture, NULL, &debugRect);

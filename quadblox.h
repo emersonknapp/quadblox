@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "SDL.h"
+#include "SDL_ttf.h"
 
 typedef uint64_t uint64;
 typedef uint16_t uint16;
@@ -11,10 +12,9 @@ const int PLAYAREA_HEIGHT = 20;
 const int SCREEN_WIDTH = 960;
 const int SCREEN_HEIGHT = 960;
 
-const int NUM_BLOCKTYPES = 7;
-const int NUM_BLOCKSTATES = 4;
 
-const int TURBOFACTOR = 16;
+#define str(s) #s
+#define TEXT_FILENAME(x) str(TEXT_ ## x) 
 
 inline SDL_Rect Rect( int x, int y, int w, int h ) {
     SDL_Rect rect;
@@ -44,6 +44,8 @@ namespace AssetType {
         BLOCK5,
         BLOCK6,
         BACKGROUND,
+        MENU_TEXT_START,
+        MENU_TEXT_QUIT,
         COUNT
     };
 }
@@ -60,11 +62,14 @@ static const char* AssetTextureFiles[AssetType::COUNT]= {
     "Block5.png",
     "Block6.png",
     "Block7.png",
-    "BG.png"
+    "BG.png",
+    TEXT_FILENAME(START),
+    TEXT_FILENAME(QUIT) 
 };
 
 typedef struct Assets {
     SDL_Texture* textures[AssetType::COUNT];
+    TTF_Font* font = NULL;
 } Assets;
 
 typedef int GameBlocks[PLAYAREA_HEIGHT][PLAYAREA_WIDTH];

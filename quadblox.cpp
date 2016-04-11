@@ -1,8 +1,11 @@
 #include <cstdlib>
 #include <cstdio>
 #include "stdlib.h"
-#include "SDL.h"
 #include "quadblox.h"
+
+const int NUM_BLOCKTYPES = 7;
+const int NUM_BLOCKSTATES = 4;
+const int TURBOFACTOR = 16;
 
 // Draw each state of each block in a 4x4 grid, represent each grid as a 16-bit int. 1 is square, 0 is no square
 const uint16_t BLOCKS[NUM_BLOCKTYPES][NUM_BLOCKSTATES] = {
